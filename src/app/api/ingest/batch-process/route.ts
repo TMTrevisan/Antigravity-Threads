@@ -101,7 +101,52 @@ export async function POST(request: Request) {
 
         const parsed = JSON.parse(responseText);
 
-        // 4. Update the DB record to Active and store details
+        // 4. Background Removal Cutout Integration (Remove.bg)
+        let processedImageUrl = garment.raw_image_url;
+        const removeBgApiKey = process.env.REMOVE_BG_API_KEY || '';
+        if (removeBgApiKey) {
+          try {
+            const removeBgFormData = new FormData();
+            removeBgFormData.append('image_url', garment.raw_image_url);
+            removeBgFormData.append('size', 'auto');
+
+            const removeBgRes = await fetch('https://api.remove.bg/v1.0/removebg', {
+              method: 'POST',
+              headers: {
+                'X-Api-Key': removeBgApiKey,
+              },
+              body: removeBgFormData,
+            });
+
+            if (removeBgRes.ok) {
+              const cutoutBlob = await removeBgRes.blob();
+              const cutoutBuffer = Buffer.from(await cutoutBlob.arrayBuffer());
+
+              const cutoutFileName = `processed/${id}-${Date.now()}.png`;
+              const { data: cutoutUpload, error: cutoutError } = await supabase.storage
+                .from('wardrobe-images')
+                .upload(cutoutFileName, cutoutBuffer, {
+                  contentType: 'image/png',
+                  upsert: true,
+                });
+
+              if (!cutoutError) {
+                const { data: { publicUrl } } = supabase.storage
+                  .from('wardrobe-images')
+                  .getPublicUrl(cutoutFileName);
+                processedImageUrl = publicUrl;
+              } else {
+                console.warn('Failed to upload cutout to storage:', cutoutError.message);
+              }
+            } else {
+              console.warn('Remove.bg responded with error status:', removeBgRes.status);
+            }
+          } catch (bgErr) {
+            console.error('Optional background removal process failed:', bgErr);
+          }
+        }
+
+        // 5. Update the DB record to Active and store details
         const { error: updateError } = await supabase
           .from('garments')
           .update({
@@ -114,7 +159,7 @@ export async function POST(request: Request) {
             fabric_type: parsed.fabric_type,
             fit_block: parsed.fit_block,
             status: 'Active',
-            processed_image_url: garment.raw_image_url, // Placeholder for cutout cutout cut
+            processed_image_url: processedImageUrl,
             ai_extracted_json: parsed,
           })
           .eq('id', id);
