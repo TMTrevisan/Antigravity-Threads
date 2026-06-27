@@ -250,8 +250,11 @@ app.use(express.json());
 let transport = null;
 // Endpoint to start the SSE session
 app.get('/sse', async (req, res) => {
-    console.log('SSE connection requested');
-    transport = new SSEServerTransport('/message', res);
+    const host = req.headers.host || 'antigravity-threads.onrender.com';
+    const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
+    const absoluteMessageUrl = `${protocol}://${host}/message`;
+    console.log(`SSE connection requested. Exposing absolute message route: ${absoluteMessageUrl}`);
+    transport = new SSEServerTransport(absoluteMessageUrl, res);
     await server.connect(transport);
 });
 // Endpoint for client messages
