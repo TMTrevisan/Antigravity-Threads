@@ -91,6 +91,8 @@ export default function Home() {
   // Active group details selection ref
   const detailFilePickerRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const detailCameraInputRef = useRef<HTMLInputElement>(null);
   const [activeDetailGroupId, setActiveDetailGroupId] = useState<string | null>(null);
 
   // Closet filtering
@@ -252,6 +254,11 @@ export default function Home() {
   const triggerAddDetail = (groupId: string) => {
     setActiveDetailGroupId(groupId);
     detailFilePickerRef.current?.click();
+  };
+
+  const triggerAddDetailCamera = (groupId: string) => {
+    setActiveDetailGroupId(groupId);
+    detailCameraInputRef.current?.click();
   };
 
   const handleDetailFilesSelected = (files: FileList | null) => {
@@ -677,6 +684,34 @@ export default function Home() {
         className="hidden"
       />
 
+      {/* HIDDEN CAMERA INPUTS */}
+      <input 
+        ref={cameraInputRef}
+        type="file" 
+        accept="image/*"
+        capture="environment"
+        onChange={(e) => {
+          if (e.target.files) {
+            handleFilesSelected(e.target.files);
+            e.target.value = '';
+          }
+        }}
+        className="hidden"
+      />
+      <input 
+        ref={detailCameraInputRef}
+        type="file" 
+        accept="image/*"
+        capture="environment"
+        onChange={(e) => {
+          if (e.target.files) {
+            handleDetailFilesSelected(e.target.files);
+            e.target.value = '';
+          }
+        }}
+        className="hidden"
+      />
+
       {/* HEADER */}
       <header className="sticky top-0 z-45 bg-[#0b0c10]/95 backdrop-blur-md border-b border-zinc-805 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -753,11 +788,8 @@ export default function Home() {
                 </p>
 
                 <div className="space-y-6">
-                  {/* Primary Dropzone */}
-                  <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-zinc-850 hover:border-teal-500/25 bg-[#0b0c10]/40 rounded-xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[100px]"
-                  >
+                  {/* Primary Ingestion Controller */}
+                  <div className="border border-zinc-800 bg-zinc-900/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-center">
                     <input 
                       ref={fileInputRef}
                       type="file" 
@@ -766,9 +798,28 @@ export default function Home() {
                       onChange={(e) => handleFilesSelected(e.target.files)}
                       className="hidden" 
                     />
-                    <div className="flex flex-col items-center gap-1">
-                      <svg className="w-7 h-7 text-zinc-550" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                      <span className="text-xs font-semibold text-white">Select Primary Garment Layout Photos</span>
+                    <div className="flex flex-col items-center gap-1.5 pointer-events-none">
+                      <svg className="w-8 h-8 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      <span className="text-xs font-bold text-white">Add Primary Garment Photos</span>
+                    </div>
+
+                    <div className="flex w-full max-w-sm gap-3 mt-1">
+                      <button
+                        type="button"
+                        style={{ minHeight: '44px' }}
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="flex-1 py-3 text-xs font-black bg-teal-400 text-zinc-950 rounded-xl active:scale-[0.98] transition shadow-md flex items-center justify-center gap-1.5"
+                      >
+                        📸 Take Photo
+                      </button>
+                      <button
+                        type="button"
+                        style={{ minHeight: '44px' }}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-1 py-3 text-xs font-bold bg-zinc-800 text-white rounded-xl active:scale-[0.98] transition border border-zinc-700 flex items-center justify-center gap-1.5"
+                      >
+                        📁 Choose Files
+                      </button>
                     </div>
                   </div>
 
@@ -795,11 +846,20 @@ export default function Home() {
                                   </div>
                                 ))}
                                 <button 
+                                  onClick={() => triggerAddDetailCamera(group.id)}
+                                  className="w-12 h-12 rounded border border-dashed border-zinc-700 bg-zinc-900/60 flex flex-col items-center justify-center text-zinc-400 hover:text-white transition"
+                                  title="Snap Tag Close-up or detail shot"
+                                >
+                                  <span className="text-[10px]">📸</span>
+                                  <span className="text-[7px] font-black uppercase">Snap</span>
+                                </button>
+                                <button 
                                   onClick={() => triggerAddDetail(group.id)}
-                                  className="w-12 h-12 rounded border border-dashed border-zinc-700 hover:border-teal-500/35 bg-zinc-900/60 flex items-center justify-center text-zinc-500 hover:text-white transition"
+                                  className="w-12 h-12 rounded border border-dashed border-zinc-700 bg-zinc-900/60 flex flex-col items-center justify-center text-zinc-400 hover:text-white transition"
                                   title="Add Tag Close-up or detail shot"
                                 >
-                                  + Detail
+                                  <span className="text-[10px]">+</span>
+                                  <span className="text-[7px] font-black uppercase">Detail</span>
                                 </button>
                               </div>
 
@@ -2020,6 +2080,54 @@ export default function Home() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      {!validationTarget && (
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-45 bg-[#0b0c10]/95 backdrop-blur-md border-t border-zinc-850 flex justify-around items-center py-2.5 pb-6 select-none shadow-2xl">
+          <button
+            onClick={() => setActiveTab('snap')}
+            className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
+              activeTab === 'snap' ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            <span className="text-[10px]">Ingest</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('closet')}
+            className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
+              activeTab === 'closet' ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            <span className="text-[10px]">Closet</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('stylist')}
+            className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
+              activeTab === 'stylist' ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+            <span className="text-[10px]">Stylist</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setShowTelemetry(!showTelemetry);
+              if (!showTelemetry) fetchTelemetry();
+            }}
+            className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
+              showTelemetry ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" /></svg>
+            <span className="text-[10px]">Metrics</span>
+          </button>
+        </nav>
       )}
     </div>
   );
