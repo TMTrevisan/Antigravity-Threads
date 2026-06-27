@@ -267,6 +267,9 @@ app.post('/message', async (req, res) => {
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'healthy', mcp: 'wardrobe-stylist-mcp' });
 });
+app.get('/', (req, res) => {
+    res.status(200).send('Wardrobe Stylist MCP Server is running. Use /sse to connect.');
+});
 app.listen(port, () => {
     console.log(`Wardrobe Stylist MCP Server running over SSE on port ${port}`);
     console.log(`SSE Route: http://localhost:${port}/sse`);
