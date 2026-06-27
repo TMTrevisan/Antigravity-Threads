@@ -1,38 +1,77 @@
-# Wardrobe Stylist AI
+# Antigravity Threads (v2.7)
 
-This is a Next.js project bootstrapped with `create-next-app` integrated with Supabase and a custom Model Context Protocol (MCP) server.
+Antigravity Threads is a premium, data-driven, autonomous personal wardrobe coordinator and styling engine. It combines a modern Next.js App Router frontend with a Supabase PostgreSQL backend, Gemini Multimodal API engines, and Pirate Weather geohash caches.
 
-## Getting Started
+---
 
-First, run the development server:
+## 🚀 Key Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+* **Asynchronous Multi-Image Ingestion (1:Many)**: Groups multiple files (e.g., wide profile shots, close-up laundry brand/size tags, and material textures) under a single garment record.
+* **Gemini Multimodal Synthesis**: Sends grouped image streams concurrently in a single multimodal request to `gemini-2.5-flash` to extract category, color, brand, sizing, and fabric metrics with zero extra token costs.
+* **Cost-Per-Wear (CPW) Tracker**: Input garment purchase prices and log wears in one click. Displays live cost-per-wear ratios (`CPW = Price / Wears`) across visual grids and spreadsheets.
+* **System Telemetry & Billing Ledger**: Audit API costs, input/output token usage, and request latencies per service from a beautiful collapsible telemetry panel.
+* **Saved Outfits**: Save outfit layouts and styling advice recommended by the AI Stylist to your saved outfits archive.
+* **Automated Weather Sync**: Syncs browser coordinates, generates an 8-character regional geohash, audits database cache hits, and queries Pirate Weather on cache misses to prevent API key token drains.
+
+---
+
+## 📐 System Architecture
+
+```mermaid
+graph TD
+    Client[Next.js App / Client] -->|1. Upload Multi-Image Group| UploadRoute[API Upload Route]
+    UploadRoute -->|2. Save Files| Storage[Supabase Storage bucket]
+    UploadRoute -->|3. Insert Garment & Images| DB[(Supabase Postgres DB)]
+    
+    Client -->|4. Trigger Ingestion| IngestRoute[API Ingestion Route]
+    IngestRoute -->|5. Read Images & Notes| DB
+    IngestRoute -->|6. Multimodal Synthesis Array| Gemini[Gemini-2.5-Flash API]
+    Gemini -->|7. Return JSON Schema| IngestRoute
+    
+    IngestRoute -->|8. Optional Cutout| BgRemoval{Background Removal Key?}
+    BgRemoval -->|Yes| RemoveBG[Remove.bg API / Cloudinary / withoutbg]
+    BgRemoval -->|No| Fallback[Fallback to Raw Image]
+    
+    RemoveBG -->|9. Upload Cutout PNG| Storage
+    IngestRoute -->|10. Set Garment Active & Store Tags| DB
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🖼️ Visual Curation Layouts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+* **Interactive Validation Workspace**: View cutout previews side-by-side with confidence metadata tags to make quick selection changes and confirm items.
+* **Dual Closet Modes**: Toggles between a visual Polaroid grid and a dense Matrix Spreadsheet grid supporting bulk actions (Archive, Donate, Discard, Delete).
+* **AI Stylist & Vibe Presets**: Pick weather details and event presets (Corporate Casual, Weekend Lounge, Date Night, Travel) to instantly generate contrast-balanced outfit options.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🎨 Background Removal Strategy
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+To keep background removal clean and cheap, we support three architectures:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Remove.bg API**: Extremely high quality, but limited to 50 free photos on the starter tier.
+2. **withoutBG**: An open-source, Apache-2.0 licensed Python library. Highly recommended for developers running local execution servers (`http://localhost:5000`) for unlimited free processing.
+3. **Cloudinary (Recommended for Zero-Cost Cloud)**: Has a massive free tier of 25,000 monthly transformations. You can upload photos to Cloudinary and return cutouts by appending `e_bgremoval` to the image URL parameters.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## ⚙️ Environment Variables
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Add these to your `.env.local` (local) and Vercel Dashboard project settings:
+
+```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Gemini AI Engine
+GEMINI_API_KEY=your_gemini_api_key
+
+# Weather Geohash
+PIRATE_WEATHER_API_KEY=your_pirate_weather_api_key
+
+# Background Removal (Optional)
+REMOVE_BG_API_KEY=your_remove_bg_api_key
+```

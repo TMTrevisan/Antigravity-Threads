@@ -4,48 +4,26 @@ import { supabase } from '@/lib/supabase';
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const imageFile = formData.get('image') as File | null;
+    
+    // Find all files in form data (e.g. image_0, image_1, etc.)
+    const files: File[] = [];
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith('image') && value instanceof File) {
+        files.push(value);
+      }
+    }
+
     const notes = formData.get('notes') as string | null;
 
-    if (!imageFile) {
-      return NextResponse.json({ error: 'No image file provided.' }, { status: 400 });
+    if (files.length === 0) {
+      return NextResponse.json({ error: 'No image files provided.' }, { status: 400 });
     }
 
-    // 1. Convert file to buffer for Supabase upload
-    const bytes = await imageFile.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    
-    // 2. Upload to Supabase Storage
-    const fileExtension = imageFile.name.split('.').pop() || 'jpg';
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
-    const filePath = `raw/${fileName}`;
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('wardrobe-images')
-      .upload(filePath, buffer, {
-        contentType: imageFile.type,
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error('Supabase upload error:', uploadError);
-      return NextResponse.json(
-        { error: `Failed to upload image to storage: ${uploadError.message}` },
-        { status: 500 }
-      );
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('wardrobe-images')
-      .getPublicUrl(filePath);
-
-    // 3. Save to database with status 'Processing' and placeholder required properties
-    const { data: dbItem, error: dbError } = await supabase
+    // 1. Insert a single garment entry in 'Processing' status
+    const { data: garment, error: dbError } = await supabase
       .from('garments')
       .insert([
         {
-          raw_image_url: publicUrl,
           category: 'Tops', // Temporary fallback
           sub_category: 'Processing...',
           color_family: 'Extracting...',
@@ -59,19 +37,76 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (dbError) {
-      console.error('Database insertion error:', dbError);
+    if (dbError || !garment) {
+      console.error('Garment insertion error:', dbError);
       return NextResponse.json(
-        { error: `Failed to save to database: ${dbError.message}` },
+        { error: `Failed to create garment: ${dbError?.message}` },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, item: dbItem });
+    // 2. Upload each file to Supabase Storage and register in garment_images
+    const imageUploadPromises = files.map(async (file, index) => {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      
+      const fileExtension = file.name.split('.').pop() || 'jpg';
+      const fileName = `${garment.id}-${index}-${Date.now()}.${fileExtension}`;
+      const filePath = `raw/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('wardrobe-images')
+        .upload(filePath, buffer, {
+          contentType: file.type,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('wardrobe-images')
+        .getPublicUrl(filePath);
+
+      // Save record in garment_images
+      const { data: imgRecord, error: imgError } = await supabase
+        .from('garment_images')
+        .insert([
+          {
+            garment_id: garment.id,
+            storage_path: publicUrl,
+            is_primary_profile: index === 0, // Mark the first image as primary
+            asset_type: index === 0 ? 'profile' : 'detail',
+          },
+        ])
+        .select()
+        .single();
+
+      if (imgError) {
+        throw new Error(`Failed to register image record: ${imgError.message}`);
+      }
+
+      return imgRecord;
+    });
+
+    const registeredImages = await Promise.all(imageUploadPromises);
+
+    // Find the primary profile image url for UI fallback
+    const primaryImg = registeredImages.find(img => img.is_primary_profile) || registeredImages[0];
+
+    return NextResponse.json({
+      success: true,
+      item: {
+        ...garment,
+        images: registeredImages,
+        primary_image_url: primaryImg ? primaryImg.storage_path : null,
+      },
+    });
   } catch (error: any) {
     console.error('Upload handler error:', error);
     return NextResponse.json(
-      { error: error.message || 'An error occurred during image upload.' },
+      { error: error.message || 'An error occurred during multi-image upload.' },
       { status: 500 }
     );
   }

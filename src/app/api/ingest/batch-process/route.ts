@@ -18,13 +18,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No garment IDs provided.' }, { status: 400 });
     }
 
-    // Process each garment ID asynchronously (concurrently with a Promise pool or map)
     const processingPromises = ids.map(async (id) => {
       try {
-        // 1. Fetch garment record from Supabase
+        // 1. Fetch garment record joined with all its related image assets
         const { data: garment, error: fetchError } = await supabase
           .from('garments')
-          .select('raw_image_url, notes')
+          .select('*, garment_images(*)')
           .eq('id', id)
           .single();
 
@@ -32,20 +31,37 @@ export async function POST(request: Request) {
           throw new Error(`Garment not found in DB: ${fetchError?.message || 'Empty row'}`);
         }
 
-        // 2. Fetch the image file into a buffer
-        const imageResponse = await fetch(garment.raw_image_url);
-        if (!imageResponse.ok) {
-          throw new Error(`Failed to fetch image file from URL: ${garment.raw_image_url}`);
+        const imagesList = garment.garment_images || [];
+        if (imagesList.length === 0) {
+          throw new Error(`No images registered for garment ID: ${id}`);
         }
-        const imageBlob = await imageResponse.blob();
-        const arrayBuffer = await imageBlob.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const base64Data = buffer.toString('base64');
-        const mimeType = imageBlob.type || 'image/jpeg';
 
-        // 3. Prompt Gemini Flash with JSON Schema constraints
+        // 2. Fetch all image assets concurrently into base64 buffers
+        const imageParts = await Promise.all(
+          imagesList.map(async (img: any) => {
+            const imageResponse = await fetch(img.storage_path);
+            if (!imageResponse.ok) {
+              throw new Error(`Failed to fetch image asset: ${img.storage_path}`);
+            }
+            const imageBlob = await imageResponse.blob();
+            const arrayBuffer = await imageBlob.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const base64Data = buffer.toString('base64');
+            const mimeType = imageBlob.type || 'image/jpeg';
+            return {
+              inlineData: {
+                data: base64Data,
+                mimeType,
+              },
+            };
+          })
+        );
+
+        // 3. Prompt Gemini Flash with JSON Schema constraints, instruction synthesis across photos
         const promptText = `
-          You are an expert fashion stylist. Analyze the attached garment image.
+          You are an expert fashion stylist. You are given multiple images of the same garment.
+          - Evaluate the wide-angle profile shot(s) to determine the category, color, silhouette, fabric texture, and fit.
+          - Evaluate close-up details or clothing laundry tags to extract the exact brand name, sizing, and specific fabric content percentages.
           
           Classify the item under these rules:
           - Category: Must be exactly one of: 'Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Tailoring'.
@@ -64,12 +80,7 @@ export async function POST(request: Request) {
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: [
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType: mimeType,
-              },
-            },
+            ...imageParts,
             promptText,
           ],
           config: {
@@ -101,13 +112,15 @@ export async function POST(request: Request) {
 
         const parsed = JSON.parse(responseText);
 
-        // 4. Background Removal Cutout Integration (Remove.bg)
-        let processedImageUrl = garment.raw_image_url;
+        // 4. Background Removal Cutout Integration (Remove.bg) on primary profile image
+        const primaryImage = imagesList.find((img: any) => img.is_primary_profile) || imagesList[0];
+        let processedImageUrl = primaryImage.storage_path;
         const removeBgApiKey = process.env.REMOVE_BG_API_KEY || '';
+        
         if (removeBgApiKey) {
           try {
             const removeBgFormData = new FormData();
-            removeBgFormData.append('image_url', garment.raw_image_url);
+            removeBgFormData.append('image_url', primaryImage.storage_path);
             removeBgFormData.append('size', 'auto');
 
             const removeBgRes = await fetch('https://api.remove.bg/v1.0/removebg', {
@@ -135,18 +148,20 @@ export async function POST(request: Request) {
                   .from('wardrobe-images')
                   .getPublicUrl(cutoutFileName);
                 processedImageUrl = publicUrl;
-              } else {
-                console.warn('Failed to upload cutout to storage:', cutoutError.message);
+
+                // Update primary image path to display background cutout
+                await supabase
+                  .from('garment_images')
+                  .update({ storage_path: processedImageUrl })
+                  .eq('id', primaryImage.id);
               }
-            } else {
-              console.warn('Remove.bg responded with error status:', removeBgRes.status);
             }
           } catch (bgErr) {
-            console.error('Optional background removal process failed:', bgErr);
+            console.error('Background removal failed, falling back:', bgErr);
           }
         }
 
-        // 5. Update the DB record to Active and store details
+        // 5. Update the core DB record to Active
         const { error: updateError } = await supabase
           .from('garments')
           .update({
@@ -159,7 +174,6 @@ export async function POST(request: Request) {
             fabric_type: parsed.fabric_type,
             fit_block: parsed.fit_block,
             status: 'Active',
-            processed_image_url: processedImageUrl,
             ai_extracted_json: parsed,
           })
           .eq('id', id);
@@ -168,16 +182,15 @@ export async function POST(request: Request) {
           throw new Error(`Failed to update garment database row: ${updateError.message}`);
         }
 
-        // 5. Log Telemetry
+        // 6. Log Telemetry
         const promptTokens = response.usageMetadata?.promptTokenCount || 0;
         const candidatesTokens = response.usageMetadata?.candidatesTokenCount || 0;
-        await logTelemetry('Gemini_Vision_Ingest', promptTokens, candidatesTokens, { garmentId: id });
+        await logTelemetry('Gemini_Vision_Ingest', promptTokens, candidatesTokens, { garmentId: id, imagesCount: imagesList.length });
 
         return { id, success: true };
       } catch (err: any) {
         console.error(`Error processing batch item ${id}:`, err);
 
-        // Flag item status as Processing_Failed so it shows up in client
         await supabase
           .from('garments')
           .update({ status: 'Processing_Failed', notes: err.message || 'Processing failed.' })

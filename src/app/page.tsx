@@ -2,6 +2,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 
+interface GarmentImage {
+  id: string;
+  storage_path: string;
+  is_primary_profile: boolean;
+  asset_type: 'profile' | 'detail';
+}
+
 interface Garment {
   id: string;
   category: string;
@@ -13,8 +20,8 @@ interface Garment {
   fabric_type: string | null;
   fit_block: string | null;
   status: 'Active' | 'Archive' | 'Donate' | 'Discard' | 'Processing' | 'Processing_Failed';
-  raw_image_url: string;
-  processed_image_url: string | null;
+  images: GarmentImage[];
+  primary_image_url: string | null;
   notes: string | null;
   price: number;
   created_at: string;
@@ -56,6 +63,14 @@ interface TelemetryStats {
   }>;
 }
 
+interface IngestGroup {
+  id: string;
+  files: File[];
+  notes: string;
+  status: 'pending' | 'uploading' | 'processing' | 'done' | 'failed';
+  error?: string;
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'snap' | 'closet' | 'stylist'>('snap');
   const [closetSubTab, setClosetSubTab] = useState<'items' | 'outfits'>('items');
@@ -67,13 +82,16 @@ export default function Home() {
   const [loadingItems, setLoadingItems] = useState(true);
   const [loadingOutfits, setLoadingOutfits] = useState(false);
 
-  // Ingestion State
-  const [uploadQueue, setUploadQueue] = useState<Array<{ file: File; status: 'pending' | 'uploading' | 'processing' | 'done' | 'failed'; error?: string }>>([]);
-  const [batchNotes, setBatchNotes] = useState('');
+  // Ingestion Groups State
+  const [ingestGroups, setIngestGroups] = useState<IngestGroup[]>([]);
   const [speechActive, setSpeechActive] = useState(false);
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   const [validationTarget, setValidationTarget] = useState<Garment | null>(null);
+
+  // Active group details selection ref
+  const detailFilePickerRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeDetailGroupId, setActiveDetailGroupId] = useState<string | null>(null);
 
   // Closet filtering
   const [viewMode, setViewMode] = useState<'grid' | 'matrix'>('grid');
@@ -213,44 +231,75 @@ export default function Home() {
     });
   };
 
-  // Drag and select
+  // Drag and select profile image (creates new group)
   const handleFilesSelected = (files: FileList | null) => {
     if (!files) return;
-    const newItems = Array.from(files).map(f => ({
-      file: f,
+    const newGroups = Array.from(files).map((f) => ({
+      id: Math.random().toString(36).substring(2, 9),
+      files: [f],
+      notes: '',
       status: 'pending' as const,
     }));
-    setUploadQueue(prev => [...prev, ...newItems]);
+    setIngestGroups(prev => [...prev, ...newGroups]);
   };
 
-  // Async process batch
+  // Add detail image to a specific group
+  const triggerAddDetail = (groupId: string) => {
+    setActiveDetailGroupId(groupId);
+    detailFilePickerRef.current?.click();
+  };
+
+  const handleDetailFilesSelected = (files: FileList | null) => {
+    if (!files || !activeDetailGroupId) return;
+    const addedFiles = Array.from(files);
+
+    setIngestGroups(prev =>
+      prev.map(g => g.id === activeDetailGroupId ? { ...g, files: [...g.files, ...addedFiles] } : g)
+    );
+    setActiveDetailGroupId(null);
+  };
+
+  // Trigger batch upload and process loop
   const triggerBatchUpload = async () => {
-    if (uploadQueue.length === 0) return;
+    if (ingestGroups.length === 0) return;
     setIsProcessingBatch(true);
     const successfullyUploadedIds: string[] = [];
 
-    const uploadPromises = uploadQueue.map(async (queueItem, index) => {
-      if (queueItem.status !== 'pending') return;
+    const uploadPromises = ingestGroups.map(async (group, index) => {
+      if (group.status !== 'pending') return;
 
-      setUploadQueue(prev => prev.map((item, idx) => idx === index ? { ...item, status: 'uploading' } : item));
+      setIngestGroups(prev => prev.map((g, idx) => idx === index ? { ...g, status: 'uploading' } : g));
 
       try {
-        const compressed = await compressImage(queueItem.file);
         const formData = new FormData();
-        formData.append('image', compressed);
-        if (batchNotes) formData.append('notes', batchNotes);
+        
+        // Compress and append all files
+        for (let i = 0; i < group.files.length; i++) {
+          const compressed = await compressImage(group.files[i]);
+          formData.append(`image_${i}`, compressed);
+        }
 
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (group.notes) {
+          formData.append('notes', group.notes);
+        }
+
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Upload failed');
 
         successfullyUploadedIds.push(data.item.id);
+        
+        // Insert item in local state
         setItems(prev => [data.item, ...prev]);
 
-        setUploadQueue(prev => prev.map((item, idx) => idx === index ? { ...item, status: 'processing' } : item));
+        setIngestGroups(prev => prev.map((g, idx) => idx === index ? { ...g, status: 'processing' } : g));
       } catch (err: any) {
         console.error(err);
-        setUploadQueue(prev => prev.map((item, idx) => idx === index ? { ...item, status: 'failed', error: err.message } : item));
+        setIngestGroups(prev => prev.map((g, idx) => idx === index ? { ...g, status: 'failed', error: err.message } : g));
       }
     });
 
@@ -266,7 +315,7 @@ export default function Home() {
         const processData = await processRes.json();
         
         await fetchItems();
-        fetchTelemetry(); // Update token telemetry
+        fetchTelemetry(); // Update telemetry metrics
 
         if (processData.results && processData.results.length > 0) {
           const successItem = items.find(i => i.id === successfullyUploadedIds[0]);
@@ -277,11 +326,11 @@ export default function Home() {
       }
     }
 
-    setUploadQueue(prev => prev.map(item => item.status === 'processing' ? { ...item, status: 'done' } : item));
+    setIngestGroups(prev => prev.map(g => g.status === 'processing' ? { ...g, status: 'done' } : g));
     setIsProcessingBatch(false);
   };
 
-  // Validation
+  // Validation confirm tags
   const handleConfirmValidation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validationTarget) return;
@@ -320,7 +369,7 @@ export default function Home() {
     }
   };
 
-  // Weather Caching
+  // Weather geohash lookup
   const syncLocalWeather = () => {
     if (!navigator.geolocation) {
       alert('Geolocation is not supported.');
@@ -343,7 +392,7 @@ export default function Home() {
           const data = await res.json();
           if (data.success && data.weather) {
             setWeatherInput(data.weather);
-            fetchTelemetry(); // Refresh weather api logging
+            fetchTelemetry();
           }
         } catch (err) {
           console.error(err);
@@ -359,9 +408,9 @@ export default function Home() {
     );
   };
 
-  // Log Worn Event (CPW Tracker)
+  // Log Wear (CPW Tracker)
   const logGarmentWorn = async (garmentId: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation(); // Prevent opening modal
+    if (e) e.stopPropagation();
     try {
       const res = await fetch('/api/items/wear', {
         method: 'POST',
@@ -371,17 +420,14 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         setWearLogs(prev => [...prev, data.log]);
-        if (editingItem?.id === garmentId) {
-          // Trigger reload inside editing modal
-          fetchWearLogs();
-        }
+        if (editingItem?.id === garmentId) fetchWearLogs();
       }
     } catch (err) {
       console.error('Failed to log wear event:', err);
     }
   };
 
-  // AI Outfit Saver
+  // Save AI Styling Outfit
   const saveStylistOutfit = async (name: string, itemIds: string[], stylingReasoning: string) => {
     setSavingOutfitIds(prev => [...prev, name]);
     try {
@@ -396,7 +442,7 @@ export default function Home() {
       });
       if (res.ok) {
         fetchSavedOutfits();
-        alert(`Outfit "${name}" saved successfully to your Closet!`);
+        alert(`Outfit "${name}" saved successfully!`);
       }
     } catch (err) {
       console.error(err);
@@ -405,7 +451,6 @@ export default function Home() {
     }
   };
 
-  // Delete saved outfit
   const deleteSavedOutfit = async (id: string) => {
     if (!confirm('Are you sure you want to delete this saved outfit?')) return;
     try {
@@ -418,7 +463,7 @@ export default function Home() {
     }
   };
 
-  // Outfits styling generator
+  // Styling generation
   const handleGenerateStylist = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
@@ -441,7 +486,7 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || 'Stylist processing failed.');
 
       setStylistResult(data.recommendations);
-      fetchTelemetry(); // Update stylist engine token counts
+      fetchTelemetry();
     } catch (err: any) {
       console.error(err);
       setStylingError(err.message || 'Error occurred.');
@@ -450,7 +495,7 @@ export default function Home() {
     }
   };
 
-  // Bulk actions updates
+  // Bulk curation
   const handleBulkChangeStatus = async (status: Garment['status']) => {
     if (selectedItemIds.length === 0) return;
     try {
@@ -491,8 +536,8 @@ export default function Home() {
     );
   };
 
-  const clearQueue = () => {
-    setUploadQueue([]);
+  const clearIngestGroups = () => {
+    setIngestGroups([]);
   };
 
   const toggleSelectAllItems = () => {
@@ -503,8 +548,24 @@ export default function Home() {
     }
   };
 
+  const getItemWornCount = (id: string) => {
+    return wearLogs.filter(l => l.garment_id === id).length;
+  };
+
+  const getItemCostPerWear = (item: Garment) => {
+    const wears = getItemWornCount(item.id);
+    if (wears === 0) return item.price || 0;
+    return Number(((item.price || 0) / wears).toFixed(2));
+  };
+
+  const handleUpdateNotes = (groupId: string, notes: string) => {
+    setIngestGroups(prev =>
+      prev.map(g => g.id === groupId ? { ...g, notes } : g)
+    );
+  };
+
   // Speech helper
-  const startSpeechNotes = () => {
+  const startSpeechNotes = (groupId: string) => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) return;
     const rec = new SpeechRecognition();
@@ -516,21 +577,12 @@ export default function Home() {
     rec.onend = () => setSpeechActive(false);
     rec.onresult = (e: any) => {
       const text = e.results[0][0].transcript;
-      setBatchNotes(prev => prev ? prev + ' ' + text : text);
+      setIngestGroups(prev =>
+        prev.map(g => g.id === groupId ? { ...g, notes: g.notes ? g.notes + ' ' + text : text } : g)
+      );
     };
     rec.onerror = () => setSpeechActive(false);
     rec.start();
-  };
-
-  // Helper selectors
-  const getItemWornCount = (id: string) => {
-    return wearLogs.filter(l => l.garment_id === id).length;
-  };
-
-  const getItemCostPerWear = (item: Garment) => {
-    const wears = getItemWornCount(item.id);
-    if (wears === 0) return item.price || 0;
-    return Number(((item.price || 0) / wears).toFixed(2));
   };
 
   const filteredItems = items.filter((item) => {
@@ -549,15 +601,26 @@ export default function Home() {
 
   return (
     <div className="flex-1 flex flex-col bg-[#0b0c10] text-[#c5c6c7] min-h-screen">
+      
+      {/* HIDDEN FILE INPUT FOR DETAIL IMAGES */}
+      <input 
+        ref={detailFilePickerRef}
+        type="file" 
+        multiple
+        accept="image/*"
+        onChange={(e) => handleDetailFilesSelected(e.target.files)}
+        className="hidden"
+      />
+
       {/* HEADER */}
-      <header className="sticky top-0 z-40 bg-[#0b0c10]/95 backdrop-blur-md border-b border-zinc-800/80 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-45 bg-[#0b0c10]/95 backdrop-blur-md border-b border-zinc-805 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 via-teal-400 to-emerald-400 flex items-center justify-center text-black font-extrabold text-sm tracking-tighter">
             AT
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              Antigravity Threads <span className="text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full font-medium">v2.6</span>
+              Antigravity Threads <span className="text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full font-medium">v2.7</span>
             </h1>
           </div>
         </div>
@@ -578,7 +641,7 @@ export default function Home() {
       <main className="flex-1 flex flex-col lg:flex-row max-w-7xl w-full mx-auto p-4 sm:p-6 gap-6 mb-24 lg:mb-0">
         
         {/* DESKTOP SIDEBAR NAV */}
-        <aside className="hidden lg:flex flex-col w-60 gap-2 pr-4 border-r border-zinc-800/60">
+        <aside className="hidden lg:flex flex-col w-60 gap-2 pr-4 border-r border-zinc-805">
           <p className="text-[10px] tracking-widest uppercase font-bold text-zinc-500 px-3 mb-2">Navigation</p>
           <button
             onClick={() => setActiveTab('snap')}
@@ -619,16 +682,16 @@ export default function Home() {
             <div className="space-y-6">
               
               <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-6 backdrop-blur-sm">
-                <h2 className="text-base font-bold text-white mb-2">Asynchronous Bulk Ingest Queue</h2>
+                <h2 className="text-base font-bold text-white mb-2">Relational Multi-Image Ingest Queue</h2>
                 <p className="text-zinc-400 text-xs mb-6">
-                  Upload up to 50 photos in the background. If you have configured a <code>REMOVE_BG_API_KEY</code>, the server will automatically strip image backgrounds in the background.
+                  Select primary garment layout photos. Then, add detail shots (laundry tags, textures, sizing labels) under each card container. Gemini will synthesize the data concurrently to extract perfect tags.
                 </p>
 
-                <div className="space-y-4">
-                  {/* Dropzone */}
+                <div className="space-y-6">
+                  {/* Primary Dropzone */}
                   <div 
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-zinc-850 hover:border-teal-500/25 bg-[#0b0c10]/40 rounded-xl p-8 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[130px]"
+                    className="border-2 border-dashed border-zinc-850 hover:border-teal-500/25 bg-[#0b0c10]/40 rounded-xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[100px]"
                   >
                     <input 
                       ref={fileInputRef}
@@ -638,52 +701,63 @@ export default function Home() {
                       onChange={(e) => handleFilesSelected(e.target.files)}
                       className="hidden" 
                     />
-                    <div className="flex flex-col items-center gap-2">
-                      <svg className="w-8 h-8 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                      <span className="text-xs font-semibold text-white">Drag or Select Images</span>
+                    <div className="flex flex-col items-center gap-1">
+                      <svg className="w-7 h-7 text-zinc-550" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      <span className="text-xs font-semibold text-white">Select Primary Garment Layout Photos</span>
                     </div>
                   </div>
 
-                  {/* Notes & Speech */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] uppercase font-bold text-zinc-500">Inference Context Notes</label>
-                      <button
-                        onClick={startSpeechNotes}
-                        className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase transition ${
-                          speechActive ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'bg-zinc-850 text-zinc-400 hover:bg-zinc-800'
-                        }`}
-                      >
-                        🎤 {speechActive ? 'Listening...' : 'Voice Note'}
-                      </button>
-                    </div>
-                    <input 
-                      type="text"
-                      placeholder="e.g. vintage jacket, tailored fit block, wool fabric..."
-                      value={batchNotes}
-                      onChange={(e) => setBatchNotes(e.target.value)}
-                      className="w-full text-xs bg-[#0b0c10]/80 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Upload List */}
-                  {uploadQueue.length > 0 && (
-                    <div className="space-y-2 pt-3 border-t border-zinc-800/80">
+                  {/* Grouped Ingest Cards */}
+                  {ingestGroups.length > 0 && (
+                    <div className="space-y-4 pt-4 border-t border-zinc-850">
                       <div className="flex items-center justify-between text-xs text-zinc-400 font-semibold">
-                        <span>Selected Queue ({uploadQueue.length} files)</span>
-                        <button onClick={clearQueue} className="text-rose-400 hover:text-rose-300">Clear All</button>
+                        <span>Items Queue ({ingestGroups.length} items configured)</span>
+                        <button onClick={clearIngestGroups} className="text-rose-400">Clear All</button>
                       </div>
 
-                      <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1.5 bg-zinc-950/40 rounded-lg">
-                        {uploadQueue.map((item, idx) => (
-                          <div key={idx} className="relative w-11 h-11 rounded border border-zinc-800 overflow-hidden bg-black shrink-0">
-                            <img src={URL.createObjectURL(item.file)} alt="" className="object-cover w-full h-full" />
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                              {item.status === 'uploading' && <div className="w-3.5 h-3.5 border-2 border-t-teal-400 border-zinc-800 rounded-full animate-spin"></div>}
-                              {item.status === 'processing' && <span className="text-[8px] text-teal-300 animate-pulse">AI</span>}
-                              {item.status === 'done' && <span className="text-[10px] text-teal-400">✔</span>}
-                              {item.status === 'failed' && <span className="text-[10px] text-rose-500">✖</span>}
-                              {item.status === 'pending' && <span className="text-[8px] text-zinc-400">🕒</span>}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {ingestGroups.map((group) => (
+                          <div key={group.id} className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl flex flex-col justify-between space-y-3">
+                            <div className="space-y-2">
+                              {/* Stack of thumbnails */}
+                              <div className="flex items-center flex-wrap gap-2">
+                                {group.files.map((file, fIdx) => (
+                                  <div key={fIdx} className="relative w-12 h-12 rounded border border-zinc-800 bg-black overflow-hidden group shrink-0">
+                                    <img src={URL.createObjectURL(file)} alt="" className="object-cover w-full h-full" />
+                                    {fIdx === 0 && (
+                                      <span className="absolute bottom-0 inset-x-0 bg-teal-400/90 text-black text-[7px] font-extrabold uppercase text-center py-0.5">Primary</span>
+                                    )}
+                                  </div>
+                                ))}
+                                <button 
+                                  onClick={() => triggerAddDetail(group.id)}
+                                  className="w-12 h-12 rounded border border-dashed border-zinc-700 hover:border-teal-500/35 bg-zinc-900/60 flex items-center justify-center text-zinc-500 hover:text-white transition"
+                                  title="Add Tag Close-up or detail shot"
+                                >
+                                  + Detail
+                                </button>
+                              </div>
+
+                              <div className="space-y-1">
+                                <span className="text-[8px] uppercase font-bold text-zinc-500">Staging notes (e.g. fit, location)</span>
+                                <input 
+                                  type="text"
+                                  value={group.notes}
+                                  onChange={(e) => handleUpdateNotes(group.id, e.target.value)}
+                                  className="w-full text-[10px] bg-[#0b0c10] border border-zinc-850 rounded px-2 py-1 text-white focus:outline-none"
+                                  placeholder="Brand details, sizing labels details..."
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[10px] pt-2 border-t border-zinc-855">
+                              <span className="text-zinc-500">Images: {group.files.length}</span>
+                              <span className={`font-bold ${
+                                group.status === 'done' ? 'text-teal-400' :
+                                group.status === 'uploading' ? 'text-zinc-400 animate-pulse' :
+                                group.status === 'processing' ? 'text-indigo-400 animate-pulse' :
+                                group.status === 'failed' ? 'text-rose-500' : 'text-zinc-550'
+                              }`}>{group.status.toUpperCase()}</span>
                             </div>
                           </div>
                         ))}
@@ -694,7 +768,7 @@ export default function Home() {
                         disabled={isProcessingBatch}
                         className="w-full py-2 bg-teal-400 text-black font-bold text-xs rounded-lg hover:bg-teal-300 transition"
                       >
-                        {isProcessingBatch ? 'Running Ingest Workers...' : 'Start Ingestion Batch'}
+                        {isProcessingBatch ? 'Running Pipeline Workers...' : 'Start Ingest Pipeline'}
                       </button>
                     </div>
                   )}
@@ -713,12 +787,20 @@ export default function Home() {
                     <div className="flex flex-col items-center justify-center p-4 bg-zinc-950/40 rounded-xl border border-zinc-850">
                       <div className="relative w-44 h-44 flex items-center justify-center">
                         <img 
-                          src={validationTarget.processed_image_url || validationTarget.raw_image_url} 
-                          alt="Processed garment" 
+                          src={validationTarget.primary_image_url || ''} 
+                          alt="Garment preview" 
                           className="object-contain w-full h-full mix-blend-lighten filter saturate-[1.1] contrast-[1.05]"
                         />
                       </div>
-                      <span className="text-[9px] text-zinc-500 font-bold uppercase mt-3">Cutout Output</span>
+                      
+                      {/* Secondary thumbnails view */}
+                      <div className="flex items-center gap-1.5 mt-4 overflow-x-auto max-w-xs py-1">
+                        {validationTarget.images.map((img) => (
+                          <div key={img.id} className="w-9 h-9 border border-zinc-800 rounded overflow-hidden shrink-0 bg-black">
+                            <img src={img.storage_path} alt="" className="object-cover w-full h-full" />
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     <form onSubmit={handleConfirmValidation} className="space-y-3.5">
@@ -759,12 +841,12 @@ export default function Home() {
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-zinc-500">Hex Code</label>
+                          <label className="text-[10px] uppercase font-bold text-zinc-500">Brand</label>
                           <input
                             type="text"
-                            value={validationTarget.hex_code || ''}
-                            onChange={(e) => setValidationTarget({ ...validationTarget, hex_code: e.target.value })}
-                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white font-mono"
+                            value={validationTarget.brand || ''}
+                            onChange={(e) => setValidationTarget({ ...validationTarget, brand: e.target.value || null })}
+                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
                           />
                         </div>
 
@@ -815,7 +897,6 @@ export default function Home() {
           {activeTab === 'closet' && (
             <div className="space-y-6">
               
-              {/* CLOSET SUB-TABS */}
               <div className="flex border-b border-zinc-800 gap-6">
                 <button
                   onClick={() => setClosetSubTab('items')}
@@ -835,7 +916,6 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* GARMENTS LIST SUB-TAB */}
               {closetSubTab === 'items' && (
                 <div className="space-y-6">
                   {/* Filters bar */}
@@ -843,7 +923,7 @@ export default function Home() {
                     <div className="flex-1 min-w-[200px]">
                       <input
                         type="text"
-                        placeholder="Search items, fabrics, colors..."
+                        placeholder="Search items, brands, materials..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full bg-[#0b0c10]/80 text-xs border border-zinc-800 rounded-xl px-4 py-2 text-white focus:outline-none"
@@ -876,7 +956,6 @@ export default function Home() {
                         <option value="Processing">Processing...</option>
                       </select>
 
-                      {/* View switch */}
                       <div className="flex rounded-lg bg-zinc-950 p-1 border border-zinc-850">
                         <button
                           onClick={() => setViewMode('grid')}
@@ -896,10 +975,7 @@ export default function Home() {
 
                   {/* Grid View */}
                   {loadingItems ? (
-                    <div className="text-center py-12">
-                      <div className="animate-spin w-5 h-5 border-2 border-t-teal-400 border-zinc-800 rounded-full mx-auto mb-2"></div>
-                      <p className="text-zinc-500 text-xs">Loading items...</p>
-                    </div>
+                    <div className="text-center py-12"><p className="text-zinc-500 text-xs">Loading items...</p></div>
                   ) : filteredItems.length === 0 ? (
                     <div className="text-center py-12 border border-zinc-800/40 border-dashed rounded-xl bg-zinc-900/10">
                       <p className="text-zinc-500 text-xs">No matching garments found.</p>
@@ -923,10 +999,18 @@ export default function Home() {
                           />
 
                           <div className="relative w-full aspect-square bg-black border-b border-zinc-850 flex items-center justify-center">
-                            <img src={item.raw_image_url} alt="" className="object-cover w-full h-full" />
-                            {item.hex_code && (
-                              <div className="absolute bottom-2 left-2 w-4 h-4 rounded-full border" style={{ backgroundColor: item.hex_code }} />
+                            {item.primary_image_url ? (
+                              <img src={item.primary_image_url} alt="" className="object-cover w-full h-full" />
+                            ) : (
+                              <div className="text-[10px] text-zinc-500">No Image</div>
                             )}
+                            
+                            {item.images && item.images.length > 1 && (
+                              <span className="absolute bottom-2 right-2 bg-black/75 px-1.5 py-0.5 rounded text-[8px] font-bold text-teal-400">
+                                📷 {item.images.length}
+                              </span>
+                            )}
+
                             {item.status === 'Processing' && (
                               <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
                                 <div className="w-3.5 h-3.5 border-2 border-t-teal-400 border-zinc-850 rounded-full animate-spin"></div>
@@ -956,7 +1040,7 @@ export default function Home() {
                       ))}
                     </div>
                   ) : (
-                    /* Matrix Spreadsheet View */
+                    /* Matrix View */
                     <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-xl overflow-hidden overflow-x-auto">
                       <table className="w-full text-left border-collapse min-w-[700px] text-xs">
                         <thead>
@@ -996,7 +1080,9 @@ export default function Home() {
                               </td>
                               <td className="p-2">
                                 <div className="w-9 h-9 rounded border border-zinc-800 overflow-hidden bg-black">
-                                  <img src={item.raw_image_url} alt="" className="object-cover w-full h-full" />
+                                  {item.primary_image_url && (
+                                    <img src={item.primary_image_url} alt="" className="object-cover w-full h-full" />
+                                  )}
                                 </div>
                               </td>
                               <td className="p-3 font-semibold text-white">
@@ -1022,7 +1108,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Bulk footer */}
+                  {/* Bulk bar */}
                   {selectedItemIds.length > 0 && (
                     <div className="fixed bottom-16 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#1f2833] border border-zinc-700 shadow-2xl rounded-full px-5 py-3 text-xs font-semibold text-white">
                       <span>Selected {selectedItemIds.length} items:</span>
@@ -1070,7 +1156,7 @@ export default function Home() {
                                 {outfitItems.map(oi => (
                                   <div key={oi.id} className="border border-zinc-800 bg-black rounded-lg overflow-hidden flex flex-col">
                                     <div className="relative aspect-square w-full">
-                                      <img src={oi.raw_image_url} alt="" className="object-cover w-full h-full" />
+                                      <img src={oi.primary_image_url || ''} alt="" className="object-cover w-full h-full" />
                                     </div>
                                     <div className="p-1 text-center bg-zinc-950">
                                       <p className="text-[8px] font-bold text-zinc-400 truncate">{oi.sub_category}</p>
@@ -1209,7 +1295,7 @@ export default function Home() {
                             <div className="grid grid-cols-3 gap-2 mb-3">
                               {outfitItems.map(oi => (
                                 <div key={oi.id} className="border border-zinc-800 bg-black rounded-lg overflow-hidden">
-                                  <img src={oi.raw_image_url} alt="" className="object-cover w-full aspect-square" />
+                                  <img src={oi.primary_image_url || ''} alt="" className="object-cover w-full aspect-square" />
                                 </div>
                               ))}
                             </div>
@@ -1242,7 +1328,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* TELEMETRY DRAWER FOOTER PANEL */}
+      {/* TELEMETRY DRAWER */}
       {showTelemetry && telemetry && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#1f2833] border-t border-zinc-800 shadow-2xl p-6 max-h-[45vh] overflow-y-auto animate-slide-up">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
@@ -1269,7 +1355,7 @@ export default function Home() {
 
           <div className="space-y-4">
             <h4 className="text-xs font-bold text-zinc-400">Transactions Ledger (Latency & Cost)</h4>
-            <div className="border border-zinc-850 bg-zinc-950/20 rounded-xl overflow-hidden overflow-x-auto text-[10px] font-mono">
+            <div className="border border-zinc-855 bg-zinc-950/20 rounded-xl overflow-hidden overflow-x-auto text-[10px] font-mono">
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-zinc-850 bg-zinc-900/60 text-zinc-400">
@@ -1296,13 +1382,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {/* MOBILE STICKY NAV */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0b0c10]/95 backdrop-blur-md border-t border-zinc-800/80 py-2.5 px-6 flex justify-around">
-        <button onClick={() => setActiveTab('snap')} className={`flex flex-col items-center gap-1 text-[9px] font-bold uppercase ${activeTab === 'snap' ? 'text-teal-400' : 'text-zinc-500'}`}>Ingest</button>
-        <button onClick={() => setActiveTab('closet')} className={`flex flex-col items-center gap-1 text-[9px] font-bold uppercase ${activeTab === 'closet' ? 'text-teal-400' : 'text-zinc-500'}`}>Curation</button>
-        <button onClick={() => setActiveTab('stylist')} className={`flex flex-col items-center gap-1 text-[9px] font-bold uppercase ${activeTab === 'stylist' ? 'text-teal-400' : 'text-zinc-500'}`}>Stylist</button>
-      </nav>
 
       {/* EDITING DIALOG MODAL */}
       {editingItem && (
@@ -1333,13 +1412,25 @@ export default function Home() {
                 setIsSavingEdit(false);
               }
             }} className="space-y-3">
+              
               <div className="relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-zinc-700 bg-black flex items-center justify-center">
-                <img src={editingItem.raw_image_url} alt="" className="object-contain w-full h-full" />
+                {editingItem.primary_image_url && (
+                  <img src={editingItem.primary_image_url} alt="" className="object-contain w-full h-full" />
+                )}
+              </div>
+
+              {/* Thumbnails list in editor */}
+              <div className="flex justify-center gap-1.5 overflow-x-auto py-1">
+                {editingItem.images.map((img) => (
+                  <div key={img.id} className="relative w-9 h-9 border border-zinc-800 rounded overflow-hidden bg-black shrink-0">
+                    <img src={img.storage_path} alt="" className="object-cover w-full h-full" />
+                  </div>
+                ))}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-500">Category</label>
+                  <label className="text-[10px] uppercase font-bold text-zinc-505">Category</label>
                   <select
                     value={editingItem.category}
                     onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
@@ -1354,7 +1445,7 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-500">Status</label>
+                  <label className="text-[10px] uppercase font-bold text-zinc-505">Status</label>
                   <select
                     value={editingItem.status}
                     onChange={(e) => setEditingItem({ ...editingItem, status: e.target.value as any })}
