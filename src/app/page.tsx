@@ -118,6 +118,7 @@ export default function Home() {
   const [touchCurrent, setTouchCurrent] = useState<number | null>(null);
   const [isSwiping, setIsSwiping] = useState(false);
   const [currentOutfitIdx, setCurrentOutfitIdx] = useState(0);
+  const [continuousSnap, setContinuousSnap] = useState(false);
 
   // Telemetry Dashboard state
   const [telemetry, setTelemetry] = useState<TelemetryStats | null>(null);
@@ -239,8 +240,8 @@ export default function Home() {
   };
 
   // Drag and select profile image (creates new group)
-  const handleFilesSelected = (files: FileList | null) => {
-    if (!files) return;
+  const handleFilesSelected = (files: FileList | null, isCameraInput: boolean = false) => {
+    if (!files || files.length === 0) return;
     const newGroups = Array.from(files).map((f) => ({
       id: Math.random().toString(36).substring(2, 9),
       files: [f],
@@ -248,6 +249,12 @@ export default function Home() {
       status: 'pending' as const,
     }));
     setIngestGroups(prev => [...prev, ...newGroups]);
+
+    if (continuousSnap && isCameraInput) {
+      setTimeout(() => {
+        cameraInputRef.current?.click();
+      }, 700);
+    }
   };
 
   // Add detail image to a specific group
@@ -692,7 +699,7 @@ export default function Home() {
         capture="environment"
         onChange={(e) => {
           if (e.target.files) {
-            handleFilesSelected(e.target.files);
+            handleFilesSelected(e.target.files, true);
             e.target.value = '';
           }
         }}
@@ -795,7 +802,7 @@ export default function Home() {
                       type="file" 
                       multiple 
                       accept="image/*" 
-                      onChange={(e) => handleFilesSelected(e.target.files)}
+                      onChange={(e) => handleFilesSelected(e.target.files, false)}
                       className="hidden" 
                     />
                     <div className="flex flex-col items-center gap-1.5 pointer-events-none">
@@ -819,6 +826,23 @@ export default function Home() {
                         className="flex-1 py-3 text-xs font-bold bg-zinc-800 text-white rounded-xl active:scale-[0.98] transition border border-zinc-700 flex items-center justify-center gap-1.5"
                       >
                         📁 Choose Files
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between w-full max-w-sm border-t border-zinc-800 pt-3.5 mt-1 select-none">
+                      <span className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-1.5">
+                        🔄 Continuous Snap Mode
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setContinuousSnap(!continuousSnap)}
+                        className={`text-[9px] font-bold px-3 py-1.5 rounded-full border transition-all ${
+                          continuousSnap 
+                            ? 'bg-teal-400/10 text-teal-400 border-teal-400/20 font-black' 
+                            : 'bg-zinc-900 text-zinc-500 border-zinc-850'
+                        }`}
+                      >
+                        {continuousSnap ? 'ON (Auto-Open)' : 'OFF (Single-Snap)'}
                       </button>
                     </div>
                   </div>
