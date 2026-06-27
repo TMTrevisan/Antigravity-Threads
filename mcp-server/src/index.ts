@@ -13,11 +13,11 @@ dotenv.config();
 const port = process.env.PORT || 10000;
 
 // Initialize Supabase Client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'placeholder';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('CRITICAL: Supabase credentials are not set in environment variables.');
+if (supabaseUrl === 'https://placeholder.supabase.co') {
+  console.warn('CRITICAL: Supabase credentials are not set in environment variables. Using placeholders.');
 }
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

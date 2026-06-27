@@ -93,7 +93,25 @@ export async function POST(request: Request) {
       const precip = Math.round((rawData.currently?.precipProbability || 0) * 100);
       const wind = Math.round(rawData.currently?.windSpeed || 5);
       
-      weatherString = `Temp: ${temp}°F | Precipitation: ${precip}% | Conditions: ${summary} | Wind: ${wind}mph`;
+      const today = rawData.daily?.data?.[0];
+      const tomorrow = rawData.daily?.data?.[1];
+      let forecastPart = '';
+      
+      if (today && tomorrow) {
+        const todayHigh = Math.round(today.temperatureMax || temp);
+        const todayLow = Math.round(today.temperatureMin || temp);
+        const todayRain = Math.round((today.precipProbability || 0) * 100);
+        const todaySum = today.summary || summary;
+        
+        const tomHigh = Math.round(tomorrow.temperatureMax || temp);
+        const tomLow = Math.round(tomorrow.temperatureMin || temp);
+        const tomRain = Math.round((tomorrow.precipProbability || 0) * 100);
+        const tomSum = tomorrow.summary || 'Clear';
+
+        forecastPart = ` | Today's Forecast: High ${todayHigh}°F, Low ${todayLow}°F, ${todayRain}% rain, ${todaySum} | Tomorrow's Forecast: High ${tomHigh}°F, Low ${tomLow}°F, ${tomRain}% rain, ${tomSum}`;
+      }
+      
+      weatherString = `Currently: ${temp}°F, ${summary}, Wind: ${wind}mph${forecastPart}`;
     } else {
       // Robust Mock Fallback if API Key is not set
       const mockTemps = [65, 72, 78, 68, 55, 60];
@@ -102,7 +120,7 @@ export async function POST(request: Request) {
       const randomSummary = mockSummaries[Math.floor(Math.random() * mockSummaries.length)];
       
       rawData = { mock: true, temperature: randomTemp, summary: randomSummary };
-      weatherString = `Temp: ${randomTemp}°F | Precipitation: 0% | Conditions: ${randomSummary} (Mock) | Wind: 4mph`;
+      weatherString = `Currently: ${randomTemp}°F, ${randomSummary} (Mock) | Today's Forecast: High ${randomTemp + 6}°F, Low ${randomTemp - 10}°F, 0% rain, Sunny | Tomorrow's Forecast: High ${randomTemp + 4}°F, Low ${randomTemp - 8}°F, 0% rain, Clear`;
     }
 
     // 3. Save to Cache
