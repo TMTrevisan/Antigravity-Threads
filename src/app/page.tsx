@@ -111,6 +111,10 @@ export default function Home() {
   const [stylingError, setStylingError] = useState('');
   const [isSyncingWeather, setIsSyncingWeather] = useState(false);
   const [savingOutfitIds, setSavingOutfitIds] = useState<string[]>([]);
+  // Mobile touch gesture validation states
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchCurrent, setTouchCurrent] = useState<number | null>(null);
+  const [isSwiping, setIsSwiping] = useState(false);
 
   // Telemetry Dashboard state
   const [telemetry, setTelemetry] = useState<TelemetryStats | null>(null);
@@ -363,6 +367,61 @@ export default function Home() {
       } else {
         const data = await res.json();
         alert(`Failed to validate item: ${data.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleConfirmValidationMobile = async (actionStatus: 'Active' | 'Donate') => {
+    if (!validationTarget) return;
+
+    try {
+      if (actionStatus === 'Donate') {
+        // Discard: Call DELETE
+        const res = await fetch('/api/items', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: validationTarget.id }),
+        });
+
+        if (res.ok) {
+          setItems(prev => prev.filter(item => item.id !== validationTarget.id));
+          const nextTarget = items.find(item => item.status === 'Processing' && item.id !== validationTarget.id);
+          setValidationTarget(nextTarget || null);
+        } else {
+          const data = await res.json();
+          alert(`Failed to discard item: ${data.error}`);
+        }
+      } else {
+        // Save: Call PATCH
+        const res = await fetch('/api/items', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: validationTarget.id,
+            category: validationTarget.category,
+            sub_category: validationTarget.sub_category,
+            brand: validationTarget.brand,
+            color_family: validationTarget.color_family,
+            hex_code: validationTarget.hex_code,
+            tonal_value: validationTarget.tonal_value,
+            fabric_type: validationTarget.fabric_type,
+            fit_block: validationTarget.fit_block,
+            price: validationTarget.price,
+            status: 'Active',
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setItems(prev => prev.map(item => item.id === data.item.id ? data.item : item));
+          const nextTarget = items.find(item => item.status === 'Processing' && item.id !== validationTarget.id);
+          setValidationTarget(nextTarget || null);
+        } else {
+          const data = await res.json();
+          alert(`Failed to save item: ${data.error}`);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -777,118 +836,356 @@ export default function Home() {
 
               {/* SPLIT VALIDATION PANEL */}
               {validationTarget && (
-                <div className="border border-zinc-850 bg-[#1f2833]/10 rounded-2xl p-6">
-                  <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse"></span>
-                    Interactive Validation Workspace
-                  </h3>
+                <>
+                  {/* Desktop Validation View (Hidden on mobile) */}
+                  <div className="hidden md:block border border-zinc-850 bg-[#1f2833]/10 rounded-2xl p-6">
+                    <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse"></span>
+                      Interactive Validation Workspace
+                    </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="flex flex-col items-center justify-center p-4 bg-zinc-950/40 rounded-xl border border-zinc-850">
-                      <div className="relative w-44 h-44 flex items-center justify-center">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="flex flex-col items-center justify-center p-4 bg-zinc-950/40 rounded-xl border border-zinc-850">
+                        <div className="relative w-44 h-44 flex items-center justify-center">
+                          <img 
+                            src={validationTarget.primary_image_url || ''} 
+                            alt="Garment preview" 
+                            className="object-contain w-full h-full mix-blend-lighten filter saturate-[1.1] contrast-[1.05]"
+                          />
+                        </div>
+                        
+                        {/* Secondary thumbnails view */}
+                        <div className="flex items-center gap-1.5 mt-4 overflow-x-auto max-w-xs py-1">
+                          {validationTarget.images.map((img) => (
+                            <div key={img.id} className="w-9 h-9 border border-zinc-800 rounded overflow-hidden shrink-0 bg-black">
+                              <img src={img.storage_path} alt="" className="object-cover w-full h-full" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <form onSubmit={handleConfirmValidation} className="space-y-3.5">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Category</label>
+                            <select
+                              value={validationTarget.category}
+                              onChange={(e) => setValidationTarget({ ...validationTarget, category: e.target.value })}
+                              className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                            >
+                              <option value="Tops">Tops</option>
+                              <option value="Bottoms">Bottoms</option>
+                              <option value="Outerwear">Outerwear</option>
+                              <option value="Footwear">Footwear</option>
+                              <option value="Tailoring">Tailoring</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Sub-Category</label>
+                            <input
+                              type="text"
+                              value={validationTarget.sub_category}
+                              onChange={(e) => setValidationTarget({ ...validationTarget, sub_category: e.target.value })}
+                              className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Color Family</label>
+                            <input
+                              type="text"
+                              value={validationTarget.color_family}
+                              onChange={(e) => setValidationTarget({ ...validationTarget, color_family: e.target.value })}
+                              className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Brand</label>
+                            <input
+                              type="text"
+                              value={validationTarget.brand || ''}
+                              onChange={(e) => setValidationTarget({ ...validationTarget, brand: e.target.value || null })}
+                              className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Purchase Price ($)</label>
+                            <input
+                              type="number"
+                              value={validationTarget.price || 0}
+                              onChange={(e) => setValidationTarget({ ...validationTarget, price: Number(e.target.value) })}
+                              className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Fabric</label>
+                            <input
+                              type="text"
+                              value={validationTarget.fabric_type || ''}
+                              onChange={(e) => setValidationTarget({ ...validationTarget, fabric_type: e.target.value })}
+                              className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-3 border-t border-zinc-850">
+                          <button
+                            type="button"
+                            onClick={() => setValidationTarget(null)}
+                            className="px-4 py-2 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded-lg text-xs font-semibold"
+                          >
+                            Skip
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-4 py-2 bg-teal-400 text-black hover:bg-teal-300 rounded-lg text-xs font-bold"
+                          >
+                            ✔ Confirm & Save to Closet
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+
+                  {/* Mobile Ergonomic Thumb-Zone & Gestures View */}
+                  <div className="md:hidden fixed inset-0 z-[100] h-screen w-screen overflow-hidden bg-zinc-950 select-none flex flex-col">
+                    {/* Visual drag glow indicators */}
+                    <div 
+                      className="absolute inset-0 pointer-events-none transition-opacity duration-200"
+                      style={{
+                        background: 'radial-gradient(circle at center, rgba(16, 185, 129, 0.15) 0%, transparent 70%)',
+                        opacity: isSwiping && touchCurrent !== null && touchStart !== null && (touchCurrent - touchStart) > 0
+                          ? Math.min((touchCurrent - touchStart) / 150, 1)
+                          : 0
+                      }}
+                    />
+                    <div 
+                      className="absolute inset-0 pointer-events-none transition-opacity duration-200"
+                      style={{
+                        background: 'radial-gradient(circle at center, rgba(239, 68, 68, 0.15) 0%, transparent 70%)',
+                        opacity: isSwiping && touchCurrent !== null && touchStart !== null && (touchCurrent - touchStart) < 0
+                          ? Math.min(Math.abs(touchCurrent - touchStart) / 150, 1)
+                          : 0
+                      }}
+                    />
+
+                    {/* Top 50%: Bounded non-interactive visual cutout card */}
+                    <div 
+                      className="h-[43vh] w-full flex flex-col items-center justify-center relative p-6 mt-2"
+                      onTouchStart={(e) => {
+                        setTouchStart(e.touches[0].clientX);
+                        setIsSwiping(true);
+                      }}
+                      onTouchMove={(e) => {
+                        if (touchStart === null) return;
+                        setTouchCurrent(e.touches[0].clientX);
+                      }}
+                      onTouchEnd={async () => {
+                        if (touchStart !== null && touchCurrent !== null) {
+                          const diff = touchCurrent - touchStart;
+                          if (diff > 70) {
+                            await handleConfirmValidationMobile('Active');
+                          } else if (diff < -70) {
+                            await handleConfirmValidationMobile('Donate');
+                          }
+                        }
+                        setTouchStart(null);
+                        setTouchCurrent(null);
+                        setIsSwiping(false);
+                      }}
+                    >
+                      <div 
+                        className="w-56 h-56 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 flex flex-col items-center justify-center shadow-xl relative overflow-hidden transition-all duration-300 active:scale-95"
+                        style={{
+                          transform: isSwiping && touchCurrent !== null && touchStart !== null
+                            ? `translateX(${touchCurrent - touchStart}px) rotate(${(touchCurrent - touchStart) * 0.08}deg)`
+                            : 'translateX(0px) rotate(0deg)',
+                          transition: isSwiping ? 'none' : 'transform 0.3s ease-out'
+                        }}
+                      >
                         <img 
                           src={validationTarget.primary_image_url || ''} 
                           alt="Garment preview" 
-                          className="object-contain w-full h-full mix-blend-lighten filter saturate-[1.1] contrast-[1.05]"
+                          className="object-contain w-36 h-36 mix-blend-lighten filter saturate-[1.1] contrast-[1.05]"
                         />
-                      </div>
-                      
-                      {/* Secondary thumbnails view */}
-                      <div className="flex items-center gap-1.5 mt-4 overflow-x-auto max-w-xs py-1">
-                        {validationTarget.images.map((img) => (
-                          <div key={img.id} className="w-9 h-9 border border-zinc-800 rounded overflow-hidden shrink-0 bg-black">
-                            <img src={img.storage_path} alt="" className="object-cover w-full h-full" />
+                        
+                        {/* Overlay text actions */}
+                        {isSwiping && touchCurrent !== null && touchStart !== null && (touchCurrent - touchStart) > 20 && (
+                          <div className="absolute top-4 right-4 bg-emerald-500 text-zinc-950 font-black text-xs px-2.5 py-1 rounded-full uppercase tracking-wider animate-pulse">
+                            Save
                           </div>
-                        ))}
+                        )}
+                        {isSwiping && touchCurrent !== null && touchStart !== null && (touchCurrent - touchStart) < -20 && (
+                          <div className="absolute top-4 left-4 bg-red-500 text-white font-black text-xs px-2.5 py-1 rounded-full uppercase tracking-wider animate-pulse">
+                            Discard
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-zinc-500 text-[9px] mt-4 uppercase tracking-widest font-black flex items-center gap-1.5 animate-pulse">
+                        Swipe Left to Discard • Swipe Right to Save
                       </div>
                     </div>
 
-                    <form onSubmit={handleConfirmValidation} className="space-y-3.5">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-zinc-500">Category</label>
-                          <select
-                            value={validationTarget.category}
-                            onChange={(e) => setValidationTarget({ ...validationTarget, category: e.target.value })}
-                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
-                          >
-                            <option value="Tops">Tops</option>
-                            <option value="Bottoms">Bottoms</option>
-                            <option value="Outerwear">Outerwear</option>
-                            <option value="Footwear">Footwear</option>
-                            <option value="Tailoring">Tailoring</option>
-                          </select>
+                    {/* Bottom 50%: Sticky Bottom Sheet anchored under thumb */}
+                    <div className="h-[57vh] bg-[#0b0c10]/95 border-t border-zinc-800 rounded-t-3xl p-6 flex flex-col justify-between shadow-2xl relative z-10 select-none pb-8">
+                      {/* Drag handle */}
+                      <div className="w-12 h-1 bg-zinc-850 rounded-full mx-auto mb-4" />
+
+                      <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-none">
+                        
+                        {/* Category selection - static option pills matrix */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Category</span>
+                          <div className="flex flex-wrap gap-2">
+                            {['Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Tailoring'].map((cat) => (
+                              <button
+                                key={cat}
+                                type="button"
+                                style={{ minHeight: '44px' }}
+                                onClick={() => setValidationTarget({ ...validationTarget, category: cat })}
+                                className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all ${
+                                  validationTarget.category === cat 
+                                    ? 'bg-teal-400 text-zinc-950 border-teal-400 shadow-md scale-105' 
+                                    : 'bg-zinc-900/60 text-zinc-400 border-zinc-850 hover:text-white'
+                                }`}
+                              >
+                                {cat}
+                              </button>
+                            ))}
+                          </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-zinc-500">Sub-Category</label>
+                        {/* Subcategory Input */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Sub-Category</span>
                           <input
                             type="text"
                             value={validationTarget.sub_category}
                             onChange={(e) => setValidationTarget({ ...validationTarget, sub_category: e.target.value })}
-                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                            className="w-full bg-zinc-900/60 border border-zinc-850 rounded-xl p-3.5 text-xs text-white placeholder-zinc-600 focus:border-teal-400 outline-none"
+                            placeholder="e.g. Linen Shirt, Chinos, Boots"
                           />
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-zinc-500">Color Family</label>
-                          <input
-                            type="text"
-                            value={validationTarget.color_family}
-                            onChange={(e) => setValidationTarget({ ...validationTarget, color_family: e.target.value })}
-                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
-                          />
+                        {/* Fits and Tonal Values matrix */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Tonal Value</span>
+                            <div className="flex gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+                              {['Light', 'Medium', 'Dark'].map((tonal) => (
+                                <button
+                                  key={tonal}
+                                  type="button"
+                                  style={{ minHeight: '40px' }}
+                                  onClick={() => setValidationTarget({ ...validationTarget, tonal_value: tonal as any })}
+                                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all shrink-0 ${
+                                    validationTarget.tonal_value === tonal 
+                                      ? 'bg-white text-zinc-950 border-white font-bold' 
+                                      : 'bg-zinc-900/60 text-zinc-400 border-zinc-850'
+                                  }`}
+                                >
+                                  {tonal}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Fit Block</span>
+                            <div className="flex gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+                              {['Slim', 'Regular', 'Relaxed', 'Tailored'].map((fit) => (
+                                <button
+                                  key={fit}
+                                  type="button"
+                                  style={{ minHeight: '40px' }}
+                                  onClick={() => setValidationTarget({ ...validationTarget, fit_block: fit })}
+                                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all shrink-0 ${
+                                    validationTarget.fit_block === fit 
+                                      ? 'bg-white text-zinc-950 border-white font-bold' 
+                                      : 'bg-zinc-900/60 text-zinc-400 border-zinc-850'
+                                  }`}
+                                >
+                                  {fit}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-zinc-500">Brand</label>
-                          <input
-                            type="text"
-                            value={validationTarget.brand || ''}
-                            onChange={(e) => setValidationTarget({ ...validationTarget, brand: e.target.value || null })}
-                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
-                          />
+                        {/* Fabric types matrix */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Fabric Type</span>
+                          <div className="flex gap-2 overflow-x-auto scrollbar-none py-1">
+                            {['Linen', 'Denim', 'Knitwear', 'Wool', 'Cotton', 'Silk', 'Leather'].map((fab) => (
+                              <button
+                                key={fab}
+                                type="button"
+                                style={{ minHeight: '40px' }}
+                                onClick={() => setValidationTarget({ ...validationTarget, fabric_type: fab })}
+                                className={`px-4 py-2 text-xs font-semibold rounded-xl border shrink-0 transition-all ${
+                                  validationTarget.fabric_type === fab 
+                                    ? 'bg-teal-400 text-zinc-950 border-teal-400 font-bold' 
+                                    : 'bg-zinc-900/60 text-zinc-400 border-zinc-850'
+                                }`}
+                              >
+                                {fab}
+                              </button>
+                            ))}
+                          </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-zinc-500">Purchase Price ($)</label>
-                          <input
-                            type="number"
-                            value={validationTarget.price || 0}
-                            onChange={(e) => setValidationTarget({ ...validationTarget, price: Number(e.target.value) })}
-                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
-                          />
+                        {/* Brand & Price input */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Brand</span>
+                            <input
+                              type="text"
+                              value={validationTarget.brand || ''}
+                              onChange={(e) => setValidationTarget({ ...validationTarget, brand: e.target.value || null })}
+                              className="w-full bg-zinc-900/60 border border-zinc-850 rounded-xl p-3.5 text-xs text-white placeholder-zinc-600 focus:border-teal-400 outline-none"
+                              placeholder="Brand name"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Est. Price ($)</span>
+                            <input
+                              type="number"
+                              value={validationTarget.price || ''}
+                              onChange={(e) => setValidationTarget({ ...validationTarget, price: Number(e.target.value) })}
+                              className="w-full bg-zinc-900/60 border border-zinc-850 rounded-xl p-3.5 text-xs text-white placeholder-zinc-600 focus:border-teal-400 outline-none"
+                              placeholder="Price"
+                            />
+                          </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-zinc-500">Fabric</label>
-                          <input
-                            type="text"
-                            value={validationTarget.fabric_type || ''}
-                            onChange={(e) => setValidationTarget({ ...validationTarget, fabric_type: e.target.value })}
-                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
-                          />
-                        </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-3 border-t border-zinc-850">
+                      {/* Controls action baseline buttons */}
+                      <div className="pt-4 border-t border-zinc-850 flex gap-3">
                         <button
                           type="button"
                           onClick={() => setValidationTarget(null)}
-                          className="px-4 py-2 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded-lg text-xs font-semibold"
+                          className="w-1/4 py-3.5 text-xs font-bold bg-zinc-900 text-zinc-400 rounded-xl active:scale-[0.97] transition-all border border-zinc-850"
                         >
                           Skip
                         </button>
                         <button
-                          type="submit"
-                          className="px-4 py-2 bg-teal-400 text-black hover:bg-teal-300 rounded-lg text-xs font-bold"
+                          type="button"
+                          onClick={() => handleConfirmValidationMobile('Active')}
+                          className="w-3/4 py-3.5 text-xs font-black bg-teal-400 text-zinc-950 rounded-xl active:scale-[0.97] transition-all shadow-lg uppercase tracking-wider"
                         >
-                          ✔ Confirm & Save to Closet
+                          Save to Closet
                         </button>
                       </div>
-                    </form>
+
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
           )}
