@@ -72,8 +72,8 @@ interface IngestGroup {
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'snap' | 'closet' | 'stylist'>('snap');
-  const [closetSubTab, setClosetSubTab] = useState<'items' | 'outfits'>('items');
+  const [activeTab, setActiveTab] = useState<'snap' | 'closet' | 'stylist' | 'metrics'>('snap');
+  const [closetSubTab, setClosetSubTab] = useState<'items' | 'outfits' | 'locker' | 'analytics'>('items');
 
   // Core Curation State
   const [items, setItems] = useState<Garment[]>([]);
@@ -126,12 +126,30 @@ export default function Home() {
   const [showTelemetry, setShowTelemetry] = useState(false);
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
 
+  // Measurements Locker state
+  const [measurements, setMeasurements] = useState<any[]>([]);
+  const [loadingMeasurements, setLoadingMeasurements] = useState(false);
+
+  const fetchMeasurements = async () => {
+    setLoadingMeasurements(true);
+    try {
+      const res = await fetch('/api/measurements');
+      const data = await res.json();
+      if (data.measurements) setMeasurements(data.measurements);
+    } catch (err) {
+      console.error('Failed to load measurements:', err);
+    } finally {
+      setLoadingMeasurements(false);
+    }
+  };
+
   // Fetch core data on load
   useEffect(() => {
     fetchItems();
     fetchWearLogs();
     fetchSavedOutfits();
     fetchTelemetry();
+    fetchMeasurements();
   }, []);
 
   const fetchItems = async () => {
@@ -1284,7 +1302,7 @@ export default function Home() {
           {activeTab === 'closet' && (
             <div className="space-y-6">
               
-              <div className="flex border-b border-zinc-800 gap-6">
+              <div className="flex border-b border-zinc-800 gap-6 overflow-x-auto scrollbar-none whitespace-nowrap pb-1">
                 <button
                   onClick={() => setClosetSubTab('items')}
                   className={`pb-2.5 text-xs font-bold uppercase tracking-wider transition ${
@@ -1300,6 +1318,22 @@ export default function Home() {
                   }`}
                 >
                   Saved Outfits ({savedOutfits.length})
+                </button>
+                <button
+                  onClick={() => setClosetSubTab('locker')}
+                  className={`pb-2.5 text-xs font-bold uppercase tracking-wider transition ${
+                    closetSubTab === 'locker' ? 'border-b-2 border-teal-400 text-teal-400' : 'text-zinc-500 hover:text-white'
+                  }`}
+                >
+                  📏 Sizing Locker ({measurements.length})
+                </button>
+                <button
+                  onClick={() => setClosetSubTab('analytics')}
+                  className={`pb-2.5 text-xs font-bold uppercase tracking-wider transition ${
+                    closetSubTab === 'analytics' ? 'border-b-2 border-teal-400 text-teal-400' : 'text-zinc-500 hover:text-white'
+                  }`}
+                >
+                  🔍 Gap Finder
                 </button>
               </div>
 
@@ -1561,6 +1595,263 @@ export default function Home() {
                       })}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* MEASUREMENTS LOCKER SUB-TAB */}
+              {closetSubTab === 'locker' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
+                    <h3 className="text-sm font-bold text-white">📏 Sizing & Measurements Locker</h3>
+                    <p className="text-zinc-400 text-xs leading-relaxed">
+                      Store your exact body sizes and reference measurements of garments that fit you perfectly. Reference them anytime when shopping!
+                    </p>
+
+                    <form 
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.currentTarget);
+                        const label = formData.get('label') as string;
+                        const type = formData.get('type') as 'body' | 'garment';
+                        const details = {
+                          chest: formData.get('chest') as string,
+                          waist: formData.get('waist') as string,
+                          inseam: formData.get('inseam') as string,
+                          sleeve: formData.get('sleeve') as string,
+                          shoulder: formData.get('shoulder') as string,
+                          length: formData.get('length') as string,
+                        };
+
+                        try {
+                          const res = await fetch('/api/measurements', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ label, measurement_type: type, details }),
+                          });
+                          if (res.ok) {
+                            fetchMeasurements();
+                            e.currentTarget.reset();
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }}
+                      className="space-y-3 pt-3 border-t border-zinc-850"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] uppercase font-bold text-zinc-550">Label / Name</label>
+                          <input 
+                            name="label" 
+                            type="text" 
+                            required 
+                            placeholder="e.g. My Body, Favorite Overshirt" 
+                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2.5 text-xs text-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] uppercase font-bold text-zinc-550">Measurement Type</label>
+                          <select 
+                            name="type" 
+                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2.5 text-xs text-white"
+                          >
+                            <option value="body">Personal Body Sizes</option>
+                            <option value="garment">Flat-Laid Garment Sizes</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase font-bold text-zinc-550">Chest (")</label>
+                          <input name="chest" type="text" placeholder='e.g. 40' className="w-full bg-[#0b0c10] border border-zinc-850 rounded p-1.5 text-xs text-center text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase font-bold text-zinc-550">Waist (")</label>
+                          <input name="waist" type="text" placeholder='e.g. 32' className="w-full bg-[#0b0c10] border border-zinc-855 rounded p-1.5 text-xs text-center text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase font-bold text-zinc-550">Inseam (")</label>
+                          <input name="inseam" type="text" placeholder='e.g. 30' className="w-full bg-[#0b0c10] border border-zinc-855 rounded p-1.5 text-xs text-center text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase font-bold text-zinc-550">Sleeve (")</label>
+                          <input name="sleeve" type="text" placeholder='e.g. 34' className="w-full bg-[#0b0c10] border border-zinc-855 rounded p-1.5 text-xs text-center text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase font-bold text-zinc-550">Shoulder (")</label>
+                          <input name="shoulder" type="text" placeholder='e.g. 18' className="w-full bg-[#0b0c10] border border-zinc-855 rounded p-1.5 text-xs text-center text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase font-bold text-zinc-550">Length (")</label>
+                          <input name="length" type="text" placeholder='e.g. 28' className="w-full bg-[#0b0c10] border border-zinc-855 rounded p-1.5 text-xs text-center text-white" />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 text-xs font-black bg-teal-400 text-zinc-950 rounded-xl active:scale-[0.98] transition shadow"
+                      >
+                        💾 Save to Locker
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {measurements.map((m) => (
+                      <div key={m.id} className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl flex flex-col justify-between space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className={`text-[8px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                              m.measurement_type === 'body' 
+                                ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
+                                : 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
+                            }`}>
+                              {m.measurement_type}
+                            </span>
+                            <h4 className="text-sm font-bold text-white mt-1.5">{m.label}</h4>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/measurements?id=${m.id}`, { method: 'DELETE' });
+                                if (res.ok) fetchMeasurements();
+                              } catch (err) {
+                                console.error(err);
+                              }
+                            }}
+                            className="text-xs text-rose-400 hover:text-rose-300 font-bold"
+                          >
+                            Delete
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 bg-[#1f2833]/10 border border-zinc-850 rounded-xl p-3 text-[10px]">
+                          {Object.entries(m.details as Record<string, any>).map(([key, val]) => (
+                            val ? (
+                              <div key={key} className="text-center">
+                                <span className="text-zinc-550 uppercase text-[8px] block font-bold">{key}</span>
+                                <span className="text-white font-black font-mono">{String(val)}"</span>
+                              </div>
+                            ) : null
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* GAP FINDER & ANALYTICS SUB-TAB */}
+              {closetSubTab === 'analytics' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Indexing breakdown */}
+                    <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
+                      <h3 className="text-sm font-bold text-white">📊 Category Distribution</h3>
+                      <div className="space-y-3">
+                        {['Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Tailoring'].map((cat) => {
+                          const count = items.filter(i => i.category === cat).length;
+                          const percentage = items.length > 0 ? (count / items.length) * 100 : 0;
+                          return (
+                            <div key={cat} className="space-y-1">
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span className="text-zinc-300">{cat}</span>
+                                <span className="text-zinc-550">{count} items ({Math.round(percentage)}%)</span>
+                              </div>
+                              <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                                <div className="bg-teal-400 h-1.5" style={{ width: `${percentage}%` }}></div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Gap finder */}
+                    <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
+                      <h3 className="text-sm font-bold text-white">🔍 Gap & Overindexing Analysis</h3>
+                      <div className="space-y-3 text-xs leading-relaxed text-zinc-350 font-medium">
+                        {items.filter(i => i.category === 'Footwear').length === 0 ? (
+                          <div className="border border-rose-500/10 bg-rose-500/5 rounded-xl p-3 text-rose-400">
+                            <strong>⚠️ Footwear Gap</strong>: You have no footwear registered! Trousers need shoes to complete silouhettes. Register calfskin loafers or canvas sneakers.
+                          </div>
+                        ) : null}
+                        {items.filter(i => i.category === 'Tailoring').length === 0 ? (
+                          <div className="border border-amber-500/10 bg-amber-500/5 rounded-xl p-3 text-amber-400">
+                            <strong>💡 Tailoring Gap</strong>: No tailoring curated. Consider adding a charcoal blazer to elevate casual bottom coordinates.
+                          </div>
+                        ) : null}
+                        {items.filter(i => i.category === 'Tops').length > 10 ? (
+                          <div className="border border-teal-500/10 bg-teal-500/5 rounded-xl p-3 text-teal-400">
+                            <strong>📈 Overindexed on Tops</strong>: You have {items.filter(i => i.category === 'Tops').length} tops. Focus on coordinating bottoms and outerwear layers to maximize wear combinations.
+                          </div>
+                        ) : null}
+                        <div className="bg-zinc-950/40 border border-zinc-850 rounded-xl p-3.5 space-y-1.5">
+                          <span className="text-[9px] uppercase font-black tracking-wider text-teal-400">Closet Balance Index</span>
+                          <p className="text-zinc-400 leading-relaxed">
+                            Your wardrobe ratio is <strong>{Math.round((items.filter(i => i.category === 'Tops').length / Math.max(items.filter(i => i.category === 'Bottoms').length, 1)) * 10) / 10} Tops to 1 Bottom</strong>. An optimal ratio is 3:1 to prevent styling fatigue.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Purging Ledger */}
+                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
+                    <h3 className="text-sm font-bold text-white">🗑️ Wardrobe Culling Suggestions (To Par Down)</h3>
+                    <p className="text-zinc-400 text-xs">
+                      The easiest way to par down is culling clothes with zero logged wears or those explicitly marked for archive/donation.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Zero wears */}
+                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-amber-400">0 Wears Logged (Inactive Weight)</span>
+                        <div className="space-y-2 max-h-[25vh] overflow-y-auto">
+                          {items.filter(i => getItemWornCount(i.id) === 0).length === 0 ? (
+                            <p className="text-[11px] text-zinc-550">Great job! You have worn every item in your closet at least once.</p>
+                          ) : (
+                            items.filter(i => getItemWornCount(i.id) === 0).map(i => (
+                              <div key={i.id} className="flex justify-between items-center bg-zinc-950/40 p-2 rounded border border-zinc-855 text-xs text-zinc-350 font-medium">
+                                <span className="truncate">{i.brand || 'Unbranded'} {i.sub_category}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingItem(i)}
+                                  className="text-[10px] font-bold text-teal-400 underline shrink-0"
+                                >
+                                  Cull
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Explicitly flagged for discard/donate */}
+                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-rose-400">Flagged to Donate/Discard</span>
+                        <div className="space-y-2 max-h-[25vh] overflow-y-auto">
+                          {items.filter(i => i.status === 'Donate' || i.status === 'Discard').length === 0 ? (
+                            <p className="text-[11px] text-zinc-550">No items are currently marked for donation or discard.</p>
+                          ) : (
+                            items.filter(i => i.status === 'Donate' || i.status === 'Discard').map(i => (
+                              <div key={i.id} className="flex justify-between items-center bg-zinc-950/40 p-2 rounded border border-zinc-855 text-xs text-zinc-350 font-medium">
+                                <span className="truncate">{i.brand || 'Unbranded'} {i.sub_category} ({i.status})</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingItem(i)}
+                                  className="text-[10px] font-bold text-teal-400 underline shrink-0"
+                                >
+                                  Manage
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1858,6 +2149,67 @@ export default function Home() {
             </div>
           )}
 
+          {/* TAB 4: METRICS (First-class View) */}
+          {activeTab === 'metrics' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-6 backdrop-blur-sm">
+                <h2 className="text-base font-bold text-white mb-2">📊 System Telemetry & Cost Ledger</h2>
+                <p className="text-zinc-400 text-xs mb-6">
+                  Detailed real-time accounting of Gemini API consumption, token usage, and latency.
+                </p>
+
+                {telemetry ? (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl">
+                        <span className="text-[10px] uppercase font-bold text-zinc-550">Cumulative Cost</span>
+                        <p className="text-2xl font-black text-emerald-400 font-mono mt-1">${telemetry.totalCost}</p>
+                      </div>
+                      <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl">
+                        <span className="text-[10px] uppercase font-bold text-zinc-550">Prompt Tokens (In)</span>
+                        <p className="text-2xl font-black text-white font-mono mt-1">{telemetry.totalTokensIn.toLocaleString()}</p>
+                      </div>
+                      <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl">
+                        <span className="text-[10px] uppercase font-bold text-zinc-550">Candidates Tokens (Out)</span>
+                        <p className="text-2xl font-black text-white font-mono mt-1">{telemetry.totalTokensOut.toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-zinc-400">Transactions Log</h4>
+                      <div className="border border-zinc-855 bg-zinc-950/20 rounded-xl overflow-hidden overflow-x-auto text-[10px] font-mono">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="border-b border-zinc-850 bg-zinc-900/60 text-zinc-400">
+                              <th className="p-2.5">Time</th>
+                              <th className="p-2.5">Service</th>
+                              <th className="p-2.5">In/Out Tokens</th>
+                              <th className="p-2.5">Est. Cost</th>
+                              <th className="p-2.5">Latency</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-850">
+                            {telemetryLogs.map((log) => (
+                              <tr key={log.id} className="text-zinc-300">
+                                <td className="p-2.5">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                                <td className="p-2.5 text-teal-400 font-bold">{log.service}</td>
+                                <td className="p-2.5">{log.tokens_in} / {log.tokens_out}</td>
+                                <td className="p-2.5 text-emerald-400 font-bold">${log.estimated_cost}</td>
+                                <td className="p-2.5">{log.latency_ms || 120}ms</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-500">Loading telemetry data...</p>
+                )}
+              </div>
+            </div>
+          )}
+
         </section>
       </main>
 
@@ -2066,6 +2418,43 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* STYLE PAIRINGS COORDINATION */}
+              <div className="space-y-2 border-t border-zinc-800 pt-2.5">
+                <span className="text-[10px] uppercase font-bold text-zinc-400">👖 Wardrobe Pairings (In Closet)</span>
+                <div className="flex gap-2 overflow-x-auto py-1 scrollbar-none">
+                  {items
+                    .filter(i => i.id !== editingItem.id && (
+                      (editingItem.category === 'Tops' && (i.category === 'Bottoms' || i.category === 'Outerwear')) ||
+                      (editingItem.category === 'Bottoms' && (i.category === 'Tops' || i.category === 'Footwear')) ||
+                      (editingItem.category === 'Outerwear' && i.category === 'Tops') ||
+                      (editingItem.category === 'Footwear' && i.category === 'Bottoms')
+                    ))
+                    .slice(0, 5)
+                    .map(pairing => (
+                      <button
+                        key={pairing.id}
+                        type="button"
+                        onClick={() => setEditingItem(pairing)}
+                        className="w-10 h-10 border border-zinc-800 rounded-lg overflow-hidden bg-black shrink-0 relative hover:border-teal-400 transition"
+                        title={`Pair with ${pairing.brand || 'Unbranded'} ${pairing.sub_category}`}
+                      >
+                        <img src={pairing.primary_image_url || ''} alt="" className="object-cover w-full h-full" />
+                      </button>
+                    ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLookbookInput(`Construct a premium outfit centered around wearing my ${editingItem.brand || 'Unbranded'} ${editingItem.sub_category} (${editingItem.color_family})`);
+                    setActiveTab('stylist');
+                    setEditingItem(null);
+                  }}
+                  className="w-full py-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-wider active:scale-[0.98] transition mt-1"
+                >
+                  🤖 Style Outfit Around This
+                </button>
+              </div>
+
               <div className="flex justify-between pt-3 border-t border-zinc-800 mt-2">
                 <button
                   type="button"
@@ -2140,12 +2529,9 @@ export default function Home() {
           </button>
 
           <button
-            onClick={() => {
-              setShowTelemetry(!showTelemetry);
-              if (!showTelemetry) fetchTelemetry();
-            }}
+            onClick={() => setActiveTab('metrics')}
             className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
-              showTelemetry ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+              activeTab === 'metrics' ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
             }`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" /></svg>
