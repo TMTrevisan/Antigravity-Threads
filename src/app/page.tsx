@@ -115,6 +115,7 @@ export default function Home() {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchCurrent, setTouchCurrent] = useState<number | null>(null);
   const [isSwiping, setIsSwiping] = useState(false);
+  const [currentOutfitIdx, setCurrentOutfitIdx] = useState(0);
 
   // Telemetry Dashboard state
   const [telemetry, setTelemetry] = useState<TelemetryStats | null>(null);
@@ -523,11 +524,16 @@ export default function Home() {
   };
 
   // Styling generation
+  const [touchStartStylist, setTouchStartStylist] = useState<number | null>(null);
+  const [touchCurrentStylist, setTouchCurrentStylist] = useState<number | null>(null);
+  const [isSwipingStylist, setIsSwipingStylist] = useState(false);
+
   const handleGenerateStylist = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
     setStylingError('');
     setStylistResult(null);
+    setCurrentOutfitIdx(0);
 
     try {
       const res = await fetch('/api/stylist', {
@@ -1568,54 +1574,200 @@ export default function Home() {
               {/* RESULT */}
               {stylistResult && (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {stylistResult.outfits.map((outfit, idx) => {
-                      const outfitItems = outfit.item_ids
-                        .map(id => items.find(item => item.id === id))
-                        .filter((item): item is Garment => !!item);
+                  {/* Desktop Layout (Hidden on mobile) */}
+                  <div className="hidden md:block space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {stylistResult.outfits.map((outfit, idx) => {
+                        const outfitItems = outfit.item_ids
+                          .map(id => items.find(item => item.id === id))
+                          .filter((item): item is Garment => !!item);
 
-                      return (
-                        <div key={idx} className="border border-zinc-850 bg-[#1f2833]/10 rounded-2xl p-5 flex flex-col justify-between space-y-4">
-                          <div>
-                            <div className="flex justify-between items-center mb-3">
-                              <span className="text-[9px] uppercase font-extrabold tracking-wider bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded">Option {idx + 1}</span>
-                              <button
-                                onClick={() => saveStylistOutfit(outfit.name, outfit.item_ids, outfit.styling_reasoning)}
-                                disabled={savingOutfitIds.includes(outfit.name)}
-                                className="text-xs text-teal-400 hover:text-teal-300 font-bold"
-                              >
-                                {savingOutfitIds.includes(outfit.name) ? 'Saving...' : '💾 Save Outfit'}
-                              </button>
+                        return (
+                          <div key={idx} className="border border-zinc-850 bg-[#1f2833]/10 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                            <div>
+                              <div className="flex justify-between items-center mb-3">
+                                <span className="text-[9px] uppercase font-extrabold tracking-wider bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded">Option {idx + 1}</span>
+                                <button
+                                  onClick={() => saveStylistOutfit(outfit.name, outfit.item_ids, outfit.styling_reasoning)}
+                                  disabled={savingOutfitIds.includes(outfit.name)}
+                                  className="text-xs text-teal-400 hover:text-teal-300 font-bold"
+                                >
+                                  {savingOutfitIds.includes(outfit.name) ? 'Saving...' : '💾 Save Outfit'}
+                                </button>
+                              </div>
+                              <h3 className="text-sm font-bold text-white mb-3">{outfit.name}</h3>
+
+                              <div className="grid grid-cols-3 gap-2 mb-3">
+                                {outfitItems.map(oi => (
+                                  <div key={oi.id} className="border border-zinc-800 bg-black rounded-lg overflow-hidden">
+                                    <img src={oi.primary_image_url || ''} alt="" className="object-cover w-full aspect-square" />
+                                  </div>
+                                ))}
+                              </div>
+
+                              <p className="text-xs text-zinc-400 leading-relaxed">{outfit.styling_reasoning}</p>
                             </div>
-                            <h3 className="text-sm font-bold text-white mb-3">{outfit.name}</h3>
-
-                            <div className="grid grid-cols-3 gap-2 mb-3">
-                              {outfitItems.map(oi => (
-                                <div key={oi.id} className="border border-zinc-800 bg-black rounded-lg overflow-hidden">
-                                  <img src={oi.primary_image_url || ''} alt="" className="object-cover w-full aspect-square" />
-                                </div>
-                              ))}
-                            </div>
-
-                            <p className="text-xs text-zinc-400 leading-relaxed">{outfit.styling_reasoning}</p>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="md:col-span-2 border border-amber-500/15 bg-amber-500/5 rounded-2xl p-5">
+                        <h4 className="text-xs font-bold text-amber-400 mb-2">⚠️ Lookbook Wardrobe Gaps</h4>
+                        <p className="text-xs text-zinc-300 leading-relaxed">{stylistResult.gap_analysis}</p>
+                      </div>
+
+                      <div className="border border-zinc-850 bg-[#1f2833]/15 rounded-2xl p-5 text-xs">
+                        <h4 className="text-xs font-bold text-teal-400 mb-2">Styling Tips</h4>
+                        <ul className="space-y-1 list-disc pl-4 text-zinc-400">
+                          {stylistResult.general_tips.map((t, i) => <li key={i}>{t}</li>)}
+                        </ul>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="md:col-span-2 border border-amber-500/15 bg-amber-500/5 rounded-2xl p-5">
-                      <h4 className="text-xs font-bold text-amber-400 mb-2">⚠️ Lookbook Wardrobe Gaps</h4>
-                      <p className="text-xs text-zinc-300 leading-relaxed">{stylistResult.gap_analysis}</p>
-                    </div>
+                  {/* Mobile Layout (Interactive Swipe Card Stack) */}
+                  <div className="md:hidden space-y-6">
+                    {currentOutfitIdx < stylistResult.outfits.length ? (
+                      (() => {
+                        const outfit = stylistResult.outfits[currentOutfitIdx];
+                        const outfitItems = outfit.item_ids
+                          .map(id => items.find(item => item.id === id))
+                          .filter((item): item is Garment => !!item);
 
-                    <div className="border border-zinc-850 bg-[#1f2833]/15 rounded-2xl p-5 text-xs">
-                      <h4 className="text-xs font-bold text-teal-400 mb-2">Styling Tips</h4>
-                      <ul className="space-y-1 list-disc pl-4 text-zinc-400">
-                        {stylistResult.general_tips.map((t, i) => <li key={i}>{t}</li>)}
-                      </ul>
-                    </div>
+                        return (
+                          <div className="relative min-h-[50vh] flex flex-col justify-between">
+                            {/* Visual swipe glows */}
+                            <div 
+                              className="absolute inset-0 pointer-events-none transition-opacity duration-200 z-0"
+                              style={{
+                                background: 'radial-gradient(circle at center, rgba(16, 185, 129, 0.1) 0%, transparent 70%)',
+                                opacity: isSwipingStylist && touchCurrentStylist !== null && touchStartStylist !== null && (touchCurrentStylist - touchStartStylist) > 0
+                                  ? Math.min((touchCurrentStylist - touchStartStylist) / 150, 1)
+                                  : 0
+                              }}
+                            />
+                            <div 
+                              className="absolute inset-0 pointer-events-none transition-opacity duration-200 z-0"
+                              style={{
+                                background: 'radial-gradient(circle at center, rgba(239, 68, 68, 0.1) 0%, transparent 70%)',
+                                opacity: isSwipingStylist && touchCurrentStylist !== null && touchStartStylist !== null && (touchCurrentStylist - touchStartStylist) < 0
+                                  ? Math.min(Math.abs(touchCurrentStylist - touchStartStylist) / 150, 1)
+                                  : 0
+                              }}
+                            />
+
+                            {/* Swipeable card */}
+                            <div
+                              onTouchStart={(e) => {
+                                setTouchStartStylist(e.touches[0].clientX);
+                                setIsSwipingStylist(true);
+                              }}
+                              onTouchMove={(e) => {
+                                if (touchStartStylist === null) return;
+                                setTouchCurrentStylist(e.touches[0].clientX);
+                              }}
+                              onTouchEnd={async () => {
+                                if (touchStartStylist !== null && touchCurrentStylist !== null) {
+                                  const diff = touchCurrentStylist - touchStartStylist;
+                                  if (diff > 70) {
+                                    // Save Outfit
+                                    await saveStylistOutfit(outfit.name, outfit.item_ids, outfit.styling_reasoning);
+                                    setCurrentOutfitIdx(prev => prev + 1);
+                                  } else if (diff < -70) {
+                                    // Pass Outfit
+                                    setCurrentOutfitIdx(prev => prev + 1);
+                                  }
+                                }
+                                setTouchStartStylist(null);
+                                setTouchCurrentStylist(null);
+                                setIsSwipingStylist(false);
+                              }}
+                              className="w-full bg-[#1f2833]/15 border border-zinc-800 rounded-3xl p-5 shadow-2xl relative z-10 transition-transform flex flex-col justify-between space-y-4"
+                              style={{
+                                transform: isSwipingStylist && touchCurrentStylist !== null && touchStartStylist !== null
+                                  ? `translateX(${touchCurrentStylist - touchStartStylist}px) rotate(${(touchCurrentStylist - touchStartStylist) * 0.05}deg)`
+                                  : 'translateX(0px) rotate(0deg)',
+                                transition: isSwipingStylist ? 'none' : 'transform 0.3s ease-out'
+                              }}
+                            >
+                              <div>
+                                <div className="flex justify-between items-center mb-3">
+                                  <span className="text-[8px] uppercase font-black tracking-wider bg-teal-400 text-zinc-950 px-2 py-0.5 rounded-full">
+                                    Option {currentOutfitIdx + 1} of {stylistResult.outfits.length}
+                                  </span>
+                                  <span className="text-[9px] text-zinc-500 uppercase font-bold animate-pulse">
+                                    ← Swipe to Pass • Save to Swipe →
+                                  </span>
+                                </div>
+                                <h3 className="text-base font-black text-white">{outfit.name}</h3>
+                              </div>
+
+                              {/* Constituents grid (Large polaroid thumbs) */}
+                              <div className="grid grid-cols-3 gap-2">
+                                {outfitItems.map(oi => (
+                                  <div key={oi.id} className="border border-zinc-800 bg-black rounded-2xl overflow-hidden aspect-square flex items-center justify-center p-1.5 shadow-md relative">
+                                    <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-lighten" />
+                                    <span className="absolute bottom-1 inset-x-1 bg-zinc-900/80 text-[7px] font-bold text-center text-zinc-400 py-0.5 rounded-md truncate">
+                                      {oi.sub_category}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <p className="text-xs text-zinc-400 leading-relaxed bg-zinc-950/40 p-3.5 border border-zinc-850 rounded-2xl">
+                                {outfit.styling_reasoning}
+                              </p>
+
+                              {/* Thumb-friendly baseline buttons */}
+                              <div className="flex gap-3 pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setCurrentOutfitIdx(prev => prev + 1)}
+                                  className="w-1/3 py-3 text-xs font-bold bg-zinc-900 text-zinc-500 border border-zinc-850 rounded-xl active:scale-95 transition"
+                                >
+                                  Pass
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await saveStylistOutfit(outfit.name, outfit.item_ids, outfit.styling_reasoning);
+                                    setCurrentOutfitIdx(prev => prev + 1);
+                                  }}
+                                  disabled={savingOutfitIds.includes(outfit.name)}
+                                  className="w-2/3 py-3 text-xs font-black bg-teal-400 text-zinc-950 rounded-xl active:scale-95 transition shadow-lg"
+                                >
+                                  {savingOutfitIds.includes(outfit.name) ? 'Saving...' : '💾 Save Outfit'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="space-y-4 animate-fade-in">
+                        <div className="border border-amber-500/15 bg-amber-500/5 rounded-2xl p-5">
+                          <h4 className="text-xs font-bold text-amber-400 mb-2">⚠️ Lookbook Wardrobe Gaps</h4>
+                          <p className="text-xs text-zinc-300 leading-relaxed">{stylistResult.gap_analysis}</p>
+                        </div>
+
+                        <div className="border border-zinc-850 bg-[#1f2833]/15 rounded-2xl p-5 text-xs">
+                          <h4 className="text-xs font-bold text-teal-400 mb-2">Styling Tips</h4>
+                          <ul className="space-y-2 list-disc pl-4 text-zinc-400">
+                            {stylistResult.general_tips.map((t, i) => <li key={i}>{t}</li>)}
+                          </ul>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setCurrentOutfitIdx(0)}
+                          className="w-full py-3.5 text-xs font-bold bg-zinc-900 text-white rounded-xl border border-zinc-800"
+                        >
+                          🔄 Review Swiped Outfits
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
