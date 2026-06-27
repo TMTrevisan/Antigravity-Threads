@@ -120,7 +120,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         switch (name) {
             case 'list_wardrobe': {
                 const { category, status } = (args || {});
-                let query = supabase.from('wardrobe_items').select('*');
+                let query = supabase.from('garments').select('*');
                 if (category && category !== 'All') {
                     query = query.eq('category', category);
                 }
@@ -146,7 +146,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 const { weather, event, lookbook } = args;
                 // Fetch active items
                 const { data: items, error } = await supabase
-                    .from('wardrobe_items')
+                    .from('garments')
                     .select('*')
                     .eq('status', 'Active');
                 if (error)
@@ -191,9 +191,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 };
             }
             case 'add_wardrobe_item': {
-                const itemData = args;
+                const { image_url, color_hex, ...rest } = args;
+                const itemData = {
+                    raw_image_url: image_url,
+                    hex_code: color_hex,
+                    ...rest
+                };
                 const { data, error } = await supabase
-                    .from('wardrobe_items')
+                    .from('garments')
                     .insert([itemData])
                     .select()
                     .single();
@@ -210,7 +215,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case 'delete_wardrobe_item': {
                 const { id } = args;
-                const { error } = await supabase.from('wardrobe_items').delete().eq('id', id);
+                const { error } = await supabase.from('garments').delete().eq('id', id);
                 if (error)
                     throw new Error(error.message);
                 return {

@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 export async function GET() {
   try {
     const { data: items, error } = await supabase
-      .from('wardrobe_items')
+      .from('garments')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -30,7 +30,7 @@ export async function PATCH(request: Request) {
     }
 
     const { data: updatedItem, error } = await supabase
-      .from('wardrobe_items')
+      .from('garments')
       .update(updates)
       .eq('id', id)
       .select()
@@ -58,8 +58,8 @@ export async function DELETE(request: Request) {
 
     // 1. Fetch item to get the image URL
     const { data: item, error: fetchError } = await supabase
-      .from('wardrobe_items')
-      .select('image_url')
+      .from('garments')
+      .select('raw_image_url')
       .eq('id', id)
       .single();
 
@@ -68,7 +68,7 @@ export async function DELETE(request: Request) {
     }
 
     // 2. Delete from Supabase Storage bucket
-    const urlParts = item.image_url.split('/wardrobe-images/');
+    const urlParts = item.raw_image_url.split('/wardrobe-images/');
     if (urlParts.length > 1) {
       const storagePath = urlParts[1];
       const { error: storageError } = await supabase.storage
@@ -82,7 +82,7 @@ export async function DELETE(request: Request) {
 
     // 3. Delete row from database
     const { error: deleteError } = await supabase
-      .from('wardrobe_items')
+      .from('garments')
       .delete()
       .eq('id', id);
 

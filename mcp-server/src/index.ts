@@ -132,7 +132,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'list_wardrobe': {
         const { category, status } = (args || {}) as { category?: string; status?: string };
-        let query = supabase.from('wardrobe_items').select('*');
+        let query = supabase.from('garments').select('*');
 
         if (category && category !== 'All') {
           query = query.eq('category', category);
@@ -161,7 +161,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         // Fetch active items
         const { data: items, error } = await supabase
-          .from('wardrobe_items')
+          .from('garments')
           .select('*')
           .eq('status', 'Active');
 
@@ -211,9 +211,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'add_wardrobe_item': {
-        const itemData = args as any;
+        const { image_url, color_hex, ...rest } = args as any;
+        const itemData = {
+          raw_image_url: image_url,
+          hex_code: color_hex,
+          ...rest
+        };
         const { data, error } = await supabase
-          .from('wardrobe_items')
+          .from('garments')
           .insert([itemData])
           .select()
           .single();
@@ -231,7 +236,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'delete_wardrobe_item': {
         const { id } = args as { id: string };
-        const { error } = await supabase.from('wardrobe_items').delete().eq('id', id);
+        const { error } = await supabase.from('garments').delete().eq('id', id);
 
         if (error) throw new Error(error.message);
         return {
