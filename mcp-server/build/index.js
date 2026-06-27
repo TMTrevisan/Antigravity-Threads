@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
 import express from 'express';
 import cors from 'cors';
+import ws from 'ws';
 import dotenv from 'dotenv';
 dotenv.config();
 const port = process.env.PORT || 10000;
@@ -14,7 +15,14 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env
 if (!supabaseUrl || !supabaseAnonKey) {
     console.error('CRITICAL: Supabase credentials are not set in environment variables.');
 }
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+        persistSession: false,
+    },
+    realtime: {
+        transport: ws,
+    },
+});
 // Initialize Gemini Client
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
 const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
