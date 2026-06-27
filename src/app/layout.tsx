@@ -16,7 +16,10 @@ export const metadata: Metadata = {
   title: "Antigravity Threads — AI Wardrobe Stylist",
   description: "Autonomous wardrobe curation engine and personal fashion stylist.",
   icons: {
-    icon: "/icon-192.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" }
+    ],
     apple: "/icon-192.png",
   },
 };
@@ -31,6 +34,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </head>
       <body className="min-h-full flex flex-col">
         {children}
         <script

@@ -740,8 +740,8 @@ export default function Home() {
       {/* HEADER */}
       <header className="sticky top-0 z-45 bg-[#0b0c10]/95 backdrop-blur-md border-b border-zinc-805 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 via-teal-400 to-emerald-400 flex items-center justify-center text-black font-extrabold text-sm tracking-tighter">
-            AT
+          <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden shadow-inner p-1">
+            <img src="/icon-192.png" alt="Antigravity Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
