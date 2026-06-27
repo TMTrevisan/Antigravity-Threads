@@ -49,7 +49,14 @@ export async function POST(request: Request) {
     const authHeader = request.headers.get('authorization');
     const systemToken = process.env.MCP_AUTH_TOKEN || '';
 
-    if (systemToken && (!authHeader || authHeader !== `Bearer ${systemToken}`)) {
+    if (!systemToken) {
+      return new Response(
+        JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Server configuration error: MCP_AUTH_TOKEN is missing.' }, id: null }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!authHeader || authHeader !== `Bearer ${systemToken}`) {
       return new Response(
         JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Unauthorized access.' }, id: null }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }

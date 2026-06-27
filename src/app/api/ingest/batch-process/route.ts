@@ -39,6 +39,12 @@ export async function POST(request: Request) {
         // 2. Fetch all image assets concurrently into base64 buffers
         const imageParts = await Promise.all(
           imagesList.map(async (img: any) => {
+            // SSRF security check: Ensure image source host matches our public Supabase endpoint
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+            if (supabaseUrl && !img.storage_path.startsWith(supabaseUrl)) {
+              throw new Error('Security Violation: Invalid image storage domain.');
+            }
+
             const imageResponse = await fetch(img.storage_path);
             if (!imageResponse.ok) {
               throw new Error(`Failed to fetch image asset: ${img.storage_path}`);

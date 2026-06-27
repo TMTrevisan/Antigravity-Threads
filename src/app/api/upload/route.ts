@@ -50,7 +50,17 @@ export async function POST(request: Request) {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
       
-      const fileExtension = file.name.split('.').pop() || 'jpg';
+      // Security validation: Only allow safe image file types
+      if (!file.type.startsWith('image/')) {
+        throw new Error(`Security Violation: File ${file.name} is not a valid image.`);
+      }
+
+      const fileExtension = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
+      if (!allowedExtensions.includes(fileExtension)) {
+        throw new Error(`Security Violation: File extension .${fileExtension} is not allowed.`);
+      }
+
       const fileName = `${garment.id}-${index}-${Date.now()}.${fileExtension}`;
       const filePath = `raw/${fileName}`;
 
