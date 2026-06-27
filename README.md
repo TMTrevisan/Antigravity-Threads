@@ -1,4 +1,6 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Wardrobe Stylist AI
+
+This is a Next.js project bootstrapped with `create-next-app` integrated with Supabase and a custom Model Context Protocol (MCP) server.
 
 ## Getting Started
 
