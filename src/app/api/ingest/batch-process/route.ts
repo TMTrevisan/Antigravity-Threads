@@ -118,10 +118,11 @@ export async function POST(request: Request) {
 
         const parsed = JSON.parse(responseText);
 
-        // 4. Background Removal Cutout Integration (Remove.bg) on primary profile image
+        // 4. Background Removal Cutout Integration (Remove.bg or local BackgroundRemover)
         const primaryImage = imagesList.find((img: any) => img.is_primary_profile) || imagesList[0];
         let processedImageUrl = primaryImage.storage_path;
         const removeBgApiKey = process.env.REMOVE_BG_API_KEY || '';
+        const localRemoverUrl = process.env.BACKGROUND_REMOVER_URL || 'http://localhost:5000';
         
         if (removeBgApiKey) {
           try {
@@ -163,7 +164,53 @@ export async function POST(request: Request) {
               }
             }
           } catch (bgErr) {
-            console.error('Background removal failed, falling back:', bgErr);
+            console.error('Remove.bg background removal failed, falling back:', bgErr);
+          }
+        } else if (localRemoverUrl) {
+          try {
+            // Fetch original image from storage
+            const imageResponse = await fetch(primaryImage.storage_path);
+            if (imageResponse.ok) {
+              const imageBlob = await imageResponse.blob();
+
+              const localFormData = new FormData();
+              localFormData.append('file', imageBlob, 'image.jpg');
+
+              const localRes = await fetch(localRemoverUrl, {
+                method: 'POST',
+                body: localFormData,
+              });
+
+              if (localRes.ok) {
+                const cutoutBlob = await localRes.blob();
+                const cutoutBuffer = Buffer.from(await cutoutBlob.arrayBuffer());
+
+                const cutoutFileName = `processed/${id}-${Date.now()}.png`;
+                const { data: cutoutUpload, error: cutoutError } = await supabase.storage
+                  .from('wardrobe-images')
+                  .upload(cutoutFileName, cutoutBuffer, {
+                    contentType: 'image/png',
+                    upsert: true,
+                  });
+
+                if (!cutoutError) {
+                  const { data: { publicUrl } } = supabase.storage
+                    .from('wardrobe-images')
+                    .getPublicUrl(cutoutFileName);
+                  processedImageUrl = publicUrl;
+
+                  // Update primary image path to display background cutout
+                  await supabase
+                    .from('garment_images')
+                    .update({ storage_path: processedImageUrl })
+                    .eq('id', primaryImage.id);
+                }
+              } else {
+                console.warn(`Local backgroundremover responded with status: ${localRes.status}`);
+              }
+            }
+          } catch (localBgErr) {
+            console.error('Local open-source background removal failed, falling back:', localBgErr);
           }
         }
 
