@@ -367,6 +367,58 @@ export default function Home() {
     setIsProcessingBatch(false);
   };
 
+  const retryGroupUpload = async (groupId: string) => {
+    setIngestGroups(prev => prev.map(g => g.id === groupId ? { ...g, status: 'uploading', error: undefined } : g));
+
+    try {
+      const groupIdx = ingestGroups.findIndex(g => g.id === groupId);
+      if (groupIdx === -1) return;
+      const group = ingestGroups[groupIdx];
+
+      const formData = new FormData();
+      for (let i = 0; i < group.files.length; i++) {
+        const compressed = await compressImage(group.files[i]);
+        formData.append(`image_${i}`, compressed);
+      }
+      if (group.notes) {
+        formData.append('notes', group.notes);
+      }
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      // Set status to processing
+      setIngestGroups(prev => prev.map(g => g.id === groupId ? { ...g, status: 'processing' } : g));
+
+      // Trigger pipeline processing for this single ID
+      const processRes = await fetch('/api/ingest/batch-process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [data.item.id] }),
+      });
+      
+      const processData = await processRes.json();
+      if (!processRes.ok) throw new Error(processData.error || 'Processing failed');
+
+      setIngestGroups(prev => prev.map(g => g.id === groupId ? { ...g, status: 'done' } : g));
+      
+      // Auto-validate if successful
+      const successItem = items.find(i => i.id === data.item.id);
+      if (successItem) setValidationTarget(successItem);
+
+      await fetchItems();
+      fetchTelemetry();
+    } catch (err: any) {
+      console.error(err);
+      setIngestGroups(prev => prev.map(g => g.id === groupId ? { ...g, status: 'failed', error: err.message } : g));
+    }
+  };
+
   // Validation confirm tags
   const handleConfirmValidation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -919,12 +971,23 @@ export default function Home() {
 
                             <div className="flex items-center justify-between text-[10px] pt-2 border-t border-zinc-855">
                               <span className="text-zinc-500">Images: {group.files.length}</span>
-                              <span className={`font-bold ${
-                                group.status === 'done' ? 'text-teal-400' :
-                                group.status === 'uploading' ? 'text-zinc-400 animate-pulse' :
-                                group.status === 'processing' ? 'text-indigo-400 animate-pulse' :
-                                group.status === 'failed' ? 'text-rose-500' : 'text-zinc-550'
-                              }`}>{group.status.toUpperCase()}</span>
+                              <div className="flex items-center gap-2">
+                                {group.status === 'failed' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => retryGroupUpload(group.id)}
+                                    className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 transition text-[9px] font-bold"
+                                  >
+                                    🔄 Retry
+                                  </button>
+                                )}
+                                <span className={`font-bold ${
+                                  group.status === 'done' ? 'text-teal-400' :
+                                  group.status === 'uploading' ? 'text-zinc-400 animate-pulse' :
+                                  group.status === 'processing' ? 'text-indigo-400 animate-pulse' :
+                                  group.status === 'failed' ? 'text-rose-500' : 'text-zinc-550'
+                                }`}>{group.status.toUpperCase()}</span>
+                              </div>
                             </div>
                             {group.status === 'failed' && group.error && (
                               <div className="text-[9px] text-rose-400 bg-rose-950/20 border border-rose-500/10 rounded-lg p-2.5 mt-1.5 leading-relaxed font-mono">
