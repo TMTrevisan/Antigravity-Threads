@@ -167,6 +167,7 @@ export async function POST(request: Request) {
             console.error('Remove.bg background removal failed, falling back:', bgErr);
           }
         } else if (localRemoverUrl) {
+          let localSuccess = false;
           try {
             // Fetch original image from storage
             const imageResponse = await fetch(primaryImage.storage_path);
@@ -204,13 +205,83 @@ export async function POST(request: Request) {
                     .from('garment_images')
                     .update({ storage_path: processedImageUrl })
                     .eq('id', primaryImage.id);
+                  localSuccess = true;
                 }
               } else {
                 console.warn(`Local backgroundremover responded with status: ${localRes.status}`);
               }
             }
           } catch (localBgErr) {
-            console.error('Local open-source background removal failed, falling back:', localBgErr);
+            console.warn('Local background removal failed, falling back to Hugging Face cloud Space:', localBgErr);
+          }
+
+          // Cloud fallback using Hugging Face Space keyless RMBG API
+          if (!localSuccess) {
+            try {
+              const imageResponse = await fetch(primaryImage.storage_path);
+              if (imageResponse.ok) {
+                const imageBlob = await imageResponse.blob();
+                const buffer = Buffer.from(await imageBlob.arrayBuffer());
+                const base64Data = buffer.toString('base64');
+                const dataUrl = `data:${imageBlob.type || 'image/jpeg'};base64,${base64Data}`;
+
+                const hfRes = await fetch('https://briaai-bria-rmbg-1-4.hf.space/run/predict', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    data: [dataUrl]
+                  }),
+                });
+
+                if (hfRes.ok) {
+                  const hfData = await hfRes.json();
+                  const outputImage = hfData.data?.[0];
+                  
+                  let cutoutBuffer: Buffer | null = null;
+                  if (outputImage) {
+                    if (typeof outputImage === 'string' && outputImage.startsWith('data:image/')) {
+                      const base64Str = outputImage.split(',')[1];
+                      cutoutBuffer = Buffer.from(base64Str, 'base64');
+                    } else if (outputImage.data && typeof outputImage.data === 'string') {
+                      const base64Str = outputImage.data.split(',')[1];
+                      cutoutBuffer = Buffer.from(base64Str, 'base64');
+                    } else if (outputImage.url) {
+                      const tempRes = await fetch(outputImage.url);
+                      if (tempRes.ok) {
+                        cutoutBuffer = Buffer.from(await (await tempRes.blob()).arrayBuffer());
+                      }
+                    }
+                  }
+
+                  if (cutoutBuffer) {
+                    const cutoutFileName = `processed/${id}-${Date.now()}.png`;
+                    const { data: cutoutUpload, error: cutoutError } = await supabase.storage
+                      .from('wardrobe-images')
+                      .upload(cutoutFileName, cutoutBuffer, {
+                        contentType: 'image/png',
+                        upsert: true,
+                      });
+
+                    if (!cutoutError) {
+                      const { data: { publicUrl } } = supabase.storage
+                        .from('wardrobe-images')
+                        .getPublicUrl(cutoutFileName);
+                      processedImageUrl = publicUrl;
+
+                      // Update primary image path to display background cutout
+                      await supabase
+                        .from('garment_images')
+                        .update({ storage_path: processedImageUrl })
+                        .eq('id', primaryImage.id);
+                    }
+                  }
+                }
+              }
+            } catch (hfErr) {
+              console.error('Hugging Face cloud background removal failed:', hfErr);
+            }
           }
         }
 
