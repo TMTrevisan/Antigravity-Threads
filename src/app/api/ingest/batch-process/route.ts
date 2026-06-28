@@ -215,65 +215,122 @@ export async function POST(request: Request) {
             console.warn('Local background removal failed, falling back to Hugging Face cloud Space:', localBgErr);
           }
 
-          // Cloud fallback: Run the local python scripts/remove_bg.py instead of the broken HF space API!
+          // Cloud fallback: Try Hugging Face serverless Inference API if HF_TOKEN is defined, otherwise fallback to local python!
           if (!localSuccess) {
-            try {
-              console.log('Running local Python background removal fallback...');
-              const imageResponse = await fetch(primaryImage.storage_path);
-              if (imageResponse.ok) {
-                const imageBlob = await imageResponse.blob();
-                const buffer = Buffer.from(await imageBlob.arrayBuffer());
+            let cloudSuccess = false;
+            const hfToken = process.env.HF_TOKEN || '';
 
-                const fs = require('fs');
-                const path = require('path');
-                const { execSync } = require('child_process');
+            if (hfToken) {
+              try {
+                console.log('Attempting Hugging Face Serverless Inference API for background removal...');
+                const imageResponse = await fetch(primaryImage.storage_path);
+                if (imageResponse.ok) {
+                  const imageBlob = await imageResponse.blob();
+                  const buffer = Buffer.from(await imageBlob.arrayBuffer());
 
-                const tempDir = path.join(process.cwd(), 'tmp');
-                if (!fs.existsSync(tempDir)) {
-                  fs.mkdirSync(tempDir, { recursive: true });
-                }
+                  const hfRes = await fetch('https://api-inference.huggingface.co/models/briaai/RMBG-1.4', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${hfToken}`,
+                      'Content-Type': 'application/octet-stream',
+                    },
+                    body: buffer,
+                  });
 
-                const tempIn = path.join(tempDir, `in-${id}.jpg`);
-                const tempOut = path.join(tempDir, `out-${id}.png`);
+                  if (hfRes.ok) {
+                    const cutoutBuffer = Buffer.from(await hfRes.arrayBuffer());
+                    const cutoutFileName = `processed/${id}-${Date.now()}.png`;
 
-                fs.writeFileSync(tempIn, buffer);
-
-                // Run python3 scripts/remove_bg.py
-                const pyScript = path.join(process.cwd(), 'scripts', 'remove_bg.py');
-                const cmd = `python3 "${pyScript}" "${tempIn}" "${tempOut}"`;
-                execSync(cmd);
-
-                if (fs.existsSync(tempOut)) {
-                  const cutoutBuffer = fs.readFileSync(tempOut);
-                  const cutoutFileName = `processed/${id}-${Date.now()}.png`;
-                  
-                  const { data: cutoutUpload, error: cutoutError } = await supabase.storage
-                    .from('wardrobe-images')
-                    .upload(cutoutFileName, cutoutBuffer, {
-                      contentType: 'image/png',
-                      upsert: true,
-                    });
-
-                  if (!cutoutError) {
-                    const { data: { publicUrl } } = supabase.storage
+                    const { data: cutoutUpload, error: cutoutError } = await supabase.storage
                       .from('wardrobe-images')
-                      .getPublicUrl(cutoutFileName);
-                    processedImageUrl = publicUrl;
+                      .upload(cutoutFileName, cutoutBuffer, {
+                        contentType: 'image/png',
+                        upsert: true,
+                      });
 
-                    // Update primary image path to display background cutout
-                    await supabase
-                      .from('garment_images')
-                      .update({ storage_path: processedImageUrl })
-                      .eq('id', primaryImage.id);
+                    if (!cutoutError) {
+                      const { data: { publicUrl } } = supabase.storage
+                        .from('wardrobe-images')
+                        .getPublicUrl(cutoutFileName);
+                      processedImageUrl = publicUrl;
+
+                      // Update primary image path to display background cutout
+                      await supabase
+                        .from('garment_images')
+                        .update({ storage_path: processedImageUrl })
+                        .eq('id', primaryImage.id);
+                      
+                      cloudSuccess = true;
+                      console.log('Hugging Face Serverless Inference background cutout successful.');
+                    }
+                  } else {
+                    console.warn(`HF Inference API responded with status: ${hfRes.status} - ${await hfRes.text()}`);
                   }
                 }
-
-                // Cleanup
-                if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
-                if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
+              } catch (hfErr) {
+                console.error('Hugging Face Serverless Inference failed:', hfErr);
               }
-            } catch (pyErr) {
-              console.error('Local Python background removal failed:', pyErr);
+            }
+
+            if (!cloudSuccess) {
+              try {
+                console.log('Running local Python background removal fallback...');
+                const imageResponse = await fetch(primaryImage.storage_path);
+                if (imageResponse.ok) {
+                  const imageBlob = await imageResponse.blob();
+                  const buffer = Buffer.from(await imageBlob.arrayBuffer());
+
+                  const fs = require('fs');
+                  const path = require('path');
+                  const { execSync } = require('child_process');
+
+                  const tempDir = path.join(process.cwd(), 'tmp');
+                  if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                  }
+
+                  const tempIn = path.join(tempDir, `in-${id}.jpg`);
+                  const tempOut = path.join(tempDir, `out-${id}.png`);
+
+                  fs.writeFileSync(tempIn, buffer);
+
+                  // Run python3 scripts/remove_bg.py
+                  const pyScript = path.join(process.cwd(), 'scripts', 'remove_bg.py');
+                  const cmd = `python3 "${pyScript}" "${tempIn}" "${tempOut}"`;
+                  execSync(cmd);
+
+                  if (fs.existsSync(tempOut)) {
+                    const cutoutBuffer = fs.readFileSync(tempOut);
+                    const cutoutFileName = `processed/${id}-${Date.now()}.png`;
+                    
+                    const { data: cutoutUpload, error: cutoutError } = await supabase.storage
+                      .from('wardrobe-images')
+                      .upload(cutoutFileName, cutoutBuffer, {
+                        contentType: 'image/png',
+                        upsert: true,
+                      });
+
+                    if (!cutoutError) {
+                      const { data: { publicUrl } } = supabase.storage
+                        .from('wardrobe-images')
+                        .getPublicUrl(cutoutFileName);
+                      processedImageUrl = publicUrl;
+
+                      // Update primary image path to display background cutout
+                      await supabase
+                        .from('garment_images')
+                        .update({ storage_path: processedImageUrl })
+                        .eq('id', primaryImage.id);
+                    }
+                  }
+
+                  // Cleanup
+                  if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+                  if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
+                }
+              } catch (pyErr) {
+                console.error('Local Python background removal failed:', pyErr);
+              }
             }
           }
         }
