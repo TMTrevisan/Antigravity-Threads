@@ -2094,6 +2094,34 @@ export default function Home() {
                               check: families.some(f => f.includes('black')) &&
                                      families.some(f => f.includes('white')) &&
                                      families.some(f => f.includes('grey') || f.includes('gray'))
+                            },
+                            {
+                              name: "Autumnal Warmth",
+                              colors: ["Burgundy/Rust", "Camel/Beige", "Dark Grey"],
+                              check: families.some(f => f.match(/burgundy|rust/)) &&
+                                     families.some(f => f.match(/camel|beige|brown/)) &&
+                                     families.some(f => f.match(/grey|gray|charcoal/))
+                            },
+                            {
+                              name: "Monochromatic Slate",
+                              colors: ["Charcoal", "Grey", "Light Grey"],
+                              check: families.some(f => f.includes('charcoal') || f.includes('black')) &&
+                                     families.some(f => f.includes('grey') || f.includes('gray')) &&
+                                     families.some(f => f.includes('light') && (f.includes('grey') || f.includes('gray')))
+                            },
+                            {
+                              name: "Classic Prep",
+                              colors: ["Navy", "White", "Tan/Beige"],
+                              check: families.some(f => f.includes('navy') || f.includes('blue')) &&
+                                     families.some(f => f.includes('white')) &&
+                                     families.some(f => f.match(/tan|beige|khaki/))
+                            },
+                            {
+                              name: "Sage & Sand",
+                              colors: ["Sage/Olive", "Sand/Beige", "Cream/White"],
+                              check: families.some(f => f.match(/sage|olive/)) &&
+                                     families.some(f => f.match(/sand|beige|khaki/)) &&
+                                     families.some(f => f.match(/cream|white/))
                             }
                           ];
 
@@ -2117,6 +2145,114 @@ export default function Home() {
                             </div>
                           );
                         })()}
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* DYNAMIC SHOPPING LIST CARD */}
+                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>🛒 Curation Shopping List (Wardrobe Gaps to Fill)</span>
+                    </h3>
+                    <p className="text-zinc-400 text-xs">
+                      These shopping recommendations are dynamically generated to unlock the maximum number of color formulas and category coordinates in your closet.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      
+                      {/* Category Gaps */}
+                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-amber-400">Category Essentials Gaps</span>
+                        <div className="space-y-2 text-xs font-medium text-zinc-300">
+                          {items.filter(i => i.category === 'Footwear').length === 0 && (
+                            <div className="flex items-start gap-2 bg-rose-950/15 border border-rose-500/10 p-2.5 rounded-lg text-rose-450">
+                              <span>👟</span>
+                              <div>
+                                <p className="font-bold text-[11px] text-white">Add Footwear</p>
+                                <p className="text-[10px] text-zinc-400 mt-0.5">Missing shoes. Add white minimalist leather sneakers or dark brown suede chelsea boots to tie bottoms coordinates together.</p>
+                              </div>
+                            </div>
+                          )}
+                          {items.filter(i => i.category === 'Tailoring').length === 0 && (
+                            <div className="flex items-start gap-2 bg-amber-950/15 border border-amber-500/10 p-2.5 rounded-lg text-amber-450">
+                              <span>🧥</span>
+                              <div>
+                                <p className="font-bold text-[11px] text-white">Add Tailoring</p>
+                                <p className="text-[10px] text-zinc-400 mt-0.5">Missing blazers. Add a textured grey tweed or structured navy wool blazer to elevate casual denim and knitwear.</p>
+                              </div>
+                            </div>
+                          )}
+                          {items.filter(i => i.category === 'Outerwear').length === 0 && (
+                            <div className="flex items-start gap-2 bg-zinc-900 border border-zinc-855 p-2.5 rounded-lg text-zinc-300">
+                              <span>🧥</span>
+                              <div>
+                                <p className="font-bold text-[11px] text-white">Add Outerwear Layer</p>
+                                <p className="text-[10px] text-zinc-400 mt-0.5">Add a classic olive field jacket or charcoal overcoat to introduce layering silhouettes.</p>
+                              </div>
+                            </div>
+                          )}
+                          {items.filter(i => i.category === 'Bottoms').length === 0 && (
+                            <div className="flex items-start gap-2 bg-rose-950/15 border border-rose-500/10 p-2.5 rounded-lg text-rose-450">
+                              <span>👖</span>
+                              <div>
+                                <p className="font-bold text-[11px] text-white">Add Bottoms</p>
+                                <p className="text-[10px] text-zinc-400 mt-0.5">Add raw denim jeans or charcoal wool trousers to build basic styling blocks.</p>
+                              </div>
+                            </div>
+                          )}
+                          {items.filter(i => i.category === 'Footwear').length > 0 && items.filter(i => i.category === 'Tailoring').length > 0 && items.filter(i => i.category === 'Outerwear').length > 0 && items.filter(i => i.category === 'Bottoms').length > 0 && (
+                            <p className="text-zinc-550 text-[11px]">✓ You own all essential wardrobe category blocks!</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Color Swatch Gaps */}
+                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-teal-400">Color Swatch Gaps (Based on Formula Misses)</span>
+                        <div className="space-y-2 text-xs font-medium text-zinc-300">
+                          {(() => {
+                            const families = items.map(i => (i.color_family || '').toLowerCase());
+                            const missingReccos = [];
+
+                            if (!families.some(f => f.includes('olive') || f.includes('sage'))) {
+                              missingReccos.push({ color: "Olive Green / Sage", formula: "Earthy Tonal / Sage & Sand", suggestion: "Add an olive overshirt or chinos to anchor warm earth-toned palettes." });
+                            }
+                            if (!families.some(f => f.match(/beige|cream|khaki|sand/))) {
+                              missingReccos.push({ color: "Beige / Cream / Sand", formula: "Earthy Tonal / Sage & Sand / Autumnal Warmth", suggestion: "Add sand trousers or a cream knit sweater to soften monochrome blocks." });
+                            }
+                            if (!families.some(f => f.includes('white'))) {
+                              missingReccos.push({ color: "White / Off-White", formula: "Earthy Tonal / High Contrast", suggestion: "Add a crisp white cotton tee or off-white button-down shirt for layering contrast." });
+                            }
+                            if (!families.some(f => f.includes('navy') || f.includes('blue'))) {
+                              missingReccos.push({ color: "Navy Blue", formula: "Modern Navy / Classic Prep", suggestion: "Add a navy crewneck or blazer. Navy functions as a soft neutral that coordinates with everything." });
+                            }
+                            if (!families.some(f => f.includes('grey') || f.includes('gray'))) {
+                              missingReccos.push({ color: "Grey / Charcoal", formula: "Modern Navy / High Contrast / Monochromatic Slate", suggestion: "Add grey flannels or a charcoal hoodie. Grey absorbs surrounding colors smoothly." });
+                            }
+                            if (!families.some(f => f.match(/burgundy|rust|camel|brown/))) {
+                              missingReccos.push({ color: "Burgundy / Rust / Camel", formula: "Autumnal Warmth", suggestion: "Add a camel overcoat or rust knitwear to inject a rich autumnal accent hue." });
+                            }
+
+                            if (missingReccos.length === 0) {
+                              return <p className="text-zinc-550 text-[11px]">✓ You own all essential neutral and accent colors!</p>;
+                            }
+
+                            return (
+                              <div className="space-y-2 max-h-[25vh] overflow-y-auto pr-1">
+                                {missingReccos.slice(0, 3).map(r => (
+                                  <div key={r.color} className="p-2 bg-zinc-950/40 border border-zinc-850 rounded text-[10px] space-y-0.5">
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-bold text-white">{r.color}</span>
+                                      <span className="text-[7px] text-zinc-500 uppercase font-black">{r.formula}</span>
+                                    </div>
+                                    <p className="text-zinc-400 text-[9px] leading-relaxed">{r.suggestion}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
 
                     </div>
