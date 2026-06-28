@@ -1212,9 +1212,14 @@ export default function Home() {
                                 if (res.ok) {
                                   await fetchItems();
                                   setValidationTarget(null);
+                                  alert('✨ Background removed successfully!');
+                                } else {
+                                  const errData = await res.json();
+                                  alert(`Cutout Failed: ${errData.error || 'Check server logs.'}`);
                                 }
-                              } catch (err) {
+                              } catch (err: any) {
                                 console.error('Failed to trigger background removal:', err);
+                                alert(`Network Error: ${err.message}`);
                               }
                             }}
                             className="px-4 py-2 bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 rounded-lg text-xs font-bold transition"
@@ -3132,9 +3137,14 @@ export default function Home() {
                         if (res.ok) {
                           await fetchItems();
                           setEditingItem(null);
+                          alert('✨ Background removed successfully!');
+                        } else {
+                          const errData = await res.json();
+                          alert(`Cutout Failed: ${errData.error || 'Check server logs.'}`);
                         }
-                      } catch (err) {
+                      } catch (err: any) {
                         console.error(err);
+                        alert(`Network Error: ${err.message}`);
                       } finally {
                         setIsSavingEdit(false);
                       }
