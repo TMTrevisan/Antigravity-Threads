@@ -2258,6 +2258,112 @@ export default function Home() {
                     </div>
                   </div>
 
+                  {/* PROPORTIONAL & TEXTURAL HARMONY PANEL */}
+                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>🎭 Silhouette, Texture & Proportion Rules</span>
+                    </h3>
+                    <p className="text-zinc-400 text-xs">
+                      Evaluating style pairings that rely on proportions, texture contrasts, and physical silhouettes rather than simple color wheels.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      
+                      {/* The Sandwich Rule */}
+                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-teal-400">The Sandwich Rule Matcher</span>
+                        {items.length === 0 ? (
+                          <span className="text-zinc-500 text-xs">Awaiting closet items.</span>
+                        ) : (() => {
+                          const outerColors = items.filter(i => i.category === 'Outerwear' || i.category === 'Tops').map(i => (i.color_family || '').toLowerCase());
+                          const shoeColors = items.filter(i => i.category === 'Footwear').map(i => (i.color_family || '').toLowerCase());
+                          
+                          const matchingColors = outerColors.filter(c => shoeColors.includes(c));
+                          const uniqueMatches = Array.from(new Set(matchingColors));
+
+                          if (uniqueMatches.length === 0) {
+                            return (
+                              <div className="space-y-1.5 text-[10px] text-zinc-400 leading-relaxed font-medium">
+                                <p className="text-amber-400 font-bold">⚠️ Sandwich Color Contrast Unavailable</p>
+                                <p>You have no matching top-layer and footwear colors. Try registering shoes in the same color family as your jackets or shirts (e.g. brown boots with a brown overshirt) to construct balanced vertical silhouettes.</p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="space-y-1.5 text-[10px] text-zinc-400 leading-relaxed font-medium">
+                              <p className="text-teal-400 font-bold">✓ Sandwich Formulas Unlocked</p>
+                              <p>You can create a balanced "sandwich" outfit by matching your <strong className="text-white capitalize">{uniqueMatches.slice(0, 2).join(' or ')}</strong> jackets/tops with matching footwear, layered over light/contrasting bottoms in the middle.</p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Textural Contrast Analysis */}
+                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-indigo-400">Textural Clash Index</span>
+                        {items.length === 0 ? (
+                          <span className="text-zinc-555 text-xs">No texture data.</span>
+                        ) : (() => {
+                          const fabrics = items.map(i => (i.fabric_type || '').toLowerCase());
+                          
+                          const rough = fabrics.filter(f => f.match(/denim|wool|corduroy|leather|tweed|knit|suede/)).length;
+                          const smooth = fabrics.filter(f => f.match(/linen|silk|cotton|tencel|poplin|nylon/)).length;
+                          
+                          const total = rough + smooth || 1;
+                          const pRough = Math.round((rough / total) * 100);
+                          const pSmooth = Math.round((smooth / total) * 100);
+
+                          let textureAdvice = "Excellent textural mix! Try clashing heavy, structured textures (e.g. corduroy/denim bottoms) with lightweight smooth drapery (e.g. linen/cotton tops) to add styling depth.";
+                          if (pRough > 80) {
+                            textureAdvice = "Highly weighted towards rough/structured fabrics. Consider adding lightweight smooth layers (cotton/linen tops) to prevent outfits from looking too heavy.";
+                          } else if (pSmooth > 80) {
+                            textureAdvice = "Highly weighted towards smooth summer drape. Consider adding a rough texture like a denim jacket or corduroy/wool pieces to introduce structural weight.";
+                          }
+
+                          return (
+                            <div className="space-y-2 text-[10px] text-zinc-400 font-medium">
+                              <div className="flex justify-between text-[9px] text-zinc-500 font-bold">
+                                <span>Rough/Structured: {pRough}%</span>
+                                <span>Smooth/Drape: {pSmooth}%</span>
+                              </div>
+                              <p className="leading-relaxed">{textureAdvice}</p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Silhouette Volume Checker */}
+                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-amber-400">Silhouette Proportions</span>
+                        {items.length === 0 ? (
+                          <span className="text-zinc-555 text-xs">Awaiting fit blocks.</span>
+                        ) : (() => {
+                          const fits = items.map(i => (i.fit_block || '').toLowerCase());
+                          
+                          const relaxed = fits.filter(f => f.includes('relaxed') || f.includes('oversized') || f.includes('loose')).length;
+                          const fitted = fits.filter(f => f.includes('slim') || f.includes('tailored') || f.includes('fitted')).length;
+
+                          let silhouetteFormula = "Classic Proportions: Layer fitted/tucked-in tops inside tailored outerwear over straight or relaxed pants to create a modern drape aesthetic.";
+                          if (relaxed > 0 && fitted > 0) {
+                            silhouetteFormula = "Proportion pairings ready: Try clashing a Relaxed bottom with a Tailored/Slim top (creates an A-Line silhouette), or vice-versa (creates an Inverted Triangle).";
+                          }
+
+                          return (
+                            <div className="space-y-2 text-[10px] text-zinc-400 font-medium">
+                              <div className="flex justify-between text-[9px] text-zinc-500 font-bold">
+                                <span>Relaxed Fits: {relaxed}</span>
+                                <span>Fitted/Tailored: {fitted}</span>
+                              </div>
+                              <p className="leading-relaxed">{silhouetteFormula}</p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                    </div>
+                  </div>
+
                   {/* Purging Ledger */}
                   <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
                     <h3 className="text-sm font-bold text-white">🗑️ Wardrobe Culling Suggestions (To Par Down)</h3>
