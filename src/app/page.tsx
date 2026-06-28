@@ -73,7 +73,7 @@ interface IngestGroup {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'snap' | 'closet' | 'stylist' | 'metrics'>('snap');
-  const [closetSubTab, setClosetSubTab] = useState<'items' | 'outfits' | 'locker' | 'analytics'>('items');
+  const [closetSubTab, setClosetSubTab] = useState<'items' | 'outfits' | 'locker' | 'analytics' | 'guide'>('items');
 
   // Core Curation State
   const [items, setItems] = useState<Garment[]>([]);
@@ -1515,6 +1515,14 @@ export default function Home() {
                 >
                   🔍 Gap Finder
                 </button>
+                <button
+                  onClick={() => setClosetSubTab('guide')}
+                  className={`pb-2.5 text-xs font-bold uppercase tracking-wider transition ${
+                    closetSubTab === 'guide' ? 'border-b-2 border-teal-400 text-teal-400' : 'text-zinc-500 hover:text-white'
+                  }`}
+                >
+                  📖 Style Guide
+                </button>
               </div>
 
               {closetSubTab === 'items' && (
@@ -2417,6 +2425,75 @@ export default function Home() {
                           )}
                         </div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {closetSubTab === 'guide' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
+                    <h3 className="text-sm font-bold text-white">📖 Wardrobe Curation & Styling Guide</h3>
+                    <p className="text-zinc-400 text-xs">
+                      A reference dictionary of key styling concepts used by the system to evaluate your closet coordination.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      
+                      {/* Rule 1: The Sandwich Rule */}
+                      <div className="p-5 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-teal-400 font-black">01. The Sandwich Rule</span>
+                        <h4 className="font-bold text-white text-xs">Creating Vertical Symmetry</h4>
+                        <p className="text-zinc-400 text-xs leading-relaxed font-medium">
+                          This rule coordinates your outfit by matching the color family or visual weight of your top layer (shirt, sweater, jacket) with your footwear, while wearing a contrasting color or value in the middle (trousers). 
+                        </p>
+                        <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-850 text-[10px] text-zinc-350 space-y-1 font-medium">
+                          <p>💡 <strong>Example:</strong> Brown leather jacket + Off-white chinos + Brown leather boots.</p>
+                          <p>🎨 <strong>Why it works:</strong> It creates visual balance by anchoring the top and bottom of the silhouette, making the outfit look structured and deliberate.</p>
+                        </div>
+                      </div>
+
+                      {/* Rule 2: Textural Contrast */}
+                      <div className="p-5 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-indigo-400 font-black">02. Textural Contrast</span>
+                        <h4 className="font-bold text-white text-xs">Adding Depth Without Color</h4>
+                        <p className="text-zinc-400 text-xs leading-relaxed font-medium">
+                          Pairing items of similar colors works beautifully if you clash textures. Avoid pairing smooth cotton tops with smooth flat trousers. Instead, contrast rough/structured fabrics against light/drape fabrics.
+                        </p>
+                        <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-850 text-[10px] text-zinc-350 space-y-1 font-medium">
+                          <p>💡 <strong>Example:</strong> A chunky wool cardigan or rugged denim jacket layered over a smooth silk or fine cotton tee.</p>
+                          <p>🎨 <strong>Why it works:</strong> Texture absorbs and reflects light differently, generating visual interest and preventing monochrome outfits from looking flat.</p>
+                        </div>
+                      </div>
+
+                      {/* Rule 3: Silhouette Proportions */}
+                      <div className="p-5 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-amber-400 font-black">03. Fit & Silhouette Proportions</span>
+                        <h4 className="font-bold text-white text-xs">Volume Contrast (A-Line & Inverted Triangle)</h4>
+                        <p className="text-zinc-400 text-xs leading-relaxed font-medium">
+                          Coordination relies heavily on balancing fit volumes. Try clashing a wide/relaxed garment with a slim/fitted one. Avoid wearing all-tight or all-loose clothing unless executing a specific silhouette layout.
+                        </p>
+                        <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-850 text-[10px] text-zinc-350 space-y-1 font-medium">
+                          <p>💡 <strong>A-Line Formula:</strong> Fitted knit top tucked into relaxed-fit pleated trousers.</p>
+                          <p>💡 <strong>Inverted Triangle:</strong> Oversized boxy hoodie/jacket over slim-fit raw denim.</p>
+                          <p>🎨 <strong>Why it works:</strong> It creates dynamic proportions and draws focus to your natural structure rather than draping shape-lessly.</p>
+                        </div>
+                      </div>
+
+                      {/* Rule 4: Tonal Contrast */}
+                      <div className="p-5 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 font-black">04. Tonal Contrast Value</span>
+                        <h4 className="font-bold text-white text-xs">Matching Light, Medium & Dark Levels</h4>
+                        <p className="text-zinc-400 text-xs leading-relaxed font-medium">
+                          Your wardrobe needs a healthy spread of tonal values. High-contrast outfits separate top and bottom cleanly. Low-contrast tonal outfits create a continuous vertical line, lengthening your look.
+                        </p>
+                        <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-850 text-[10px] text-zinc-350 space-y-1 font-medium">
+                          <p>💡 <strong>High Contrast:</strong> Crisp white linen shirt paired with dark charcoal trousers.</p>
+                          <p>💡 <strong>Low Tonal:</strong> Slate grey tee paired with light grey flannel trousers.</p>
+                          <p>🎨 <strong>Why it works:</strong> Tonal spacing dictates the mood (formal/academic vs. relaxed/casual) and balances vertical highlights.</p>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 </div>

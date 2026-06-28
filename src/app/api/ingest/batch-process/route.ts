@@ -215,72 +215,65 @@ export async function POST(request: Request) {
             console.warn('Local background removal failed, falling back to Hugging Face cloud Space:', localBgErr);
           }
 
-          // Cloud fallback using Hugging Face Space keyless RMBG API
+          // Cloud fallback: Run the local python scripts/remove_bg.py instead of the broken HF space API!
           if (!localSuccess) {
             try {
+              console.log('Running local Python background removal fallback...');
               const imageResponse = await fetch(primaryImage.storage_path);
               if (imageResponse.ok) {
                 const imageBlob = await imageResponse.blob();
                 const buffer = Buffer.from(await imageBlob.arrayBuffer());
-                const base64Data = buffer.toString('base64');
-                const dataUrl = `data:${imageBlob.type || 'image/jpeg'};base64,${base64Data}`;
 
-                const hfRes = await fetch('https://briaai-bria-rmbg-1-4.hf.space/run/predict', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    data: [dataUrl]
-                  }),
-                });
+                const fs = require('fs');
+                const path = require('path');
+                const { execSync } = require('child_process');
 
-                if (hfRes.ok) {
-                  const hfData = await hfRes.json();
-                  const outputImage = hfData.data?.[0];
+                const tempDir = path.join(process.cwd(), 'tmp');
+                if (!fs.existsSync(tempDir)) {
+                  fs.mkdirSync(tempDir, { recursive: true });
+                }
+
+                const tempIn = path.join(tempDir, `in-${id}.jpg`);
+                const tempOut = path.join(tempDir, `out-${id}.png`);
+
+                fs.writeFileSync(tempIn, buffer);
+
+                // Run python3 scripts/remove_bg.py
+                const pyScript = path.join(process.cwd(), 'scripts', 'remove_bg.py');
+                const cmd = `python3 "${pyScript}" "${tempIn}" "${tempOut}"`;
+                execSync(cmd);
+
+                if (fs.existsSync(tempOut)) {
+                  const cutoutBuffer = fs.readFileSync(tempOut);
+                  const cutoutFileName = `processed/${id}-${Date.now()}.png`;
                   
-                  let cutoutBuffer: Buffer | null = null;
-                  if (outputImage) {
-                    if (typeof outputImage === 'string' && outputImage.startsWith('data:image/')) {
-                      const base64Str = outputImage.split(',')[1];
-                      cutoutBuffer = Buffer.from(base64Str, 'base64');
-                    } else if (outputImage.data && typeof outputImage.data === 'string') {
-                      const base64Str = outputImage.data.split(',')[1];
-                      cutoutBuffer = Buffer.from(base64Str, 'base64');
-                    } else if (outputImage.url) {
-                      const tempRes = await fetch(outputImage.url);
-                      if (tempRes.ok) {
-                        cutoutBuffer = Buffer.from(await (await tempRes.blob()).arrayBuffer());
-                      }
-                    }
-                  }
+                  const { data: cutoutUpload, error: cutoutError } = await supabase.storage
+                    .from('wardrobe-images')
+                    .upload(cutoutFileName, cutoutBuffer, {
+                      contentType: 'image/png',
+                      upsert: true,
+                    });
 
-                  if (cutoutBuffer) {
-                    const cutoutFileName = `processed/${id}-${Date.now()}.png`;
-                    const { data: cutoutUpload, error: cutoutError } = await supabase.storage
+                  if (!cutoutError) {
+                    const { data: { publicUrl } } = supabase.storage
                       .from('wardrobe-images')
-                      .upload(cutoutFileName, cutoutBuffer, {
-                        contentType: 'image/png',
-                        upsert: true,
-                      });
+                      .getPublicUrl(cutoutFileName);
+                    processedImageUrl = publicUrl;
 
-                    if (!cutoutError) {
-                      const { data: { publicUrl } } = supabase.storage
-                        .from('wardrobe-images')
-                        .getPublicUrl(cutoutFileName);
-                      processedImageUrl = publicUrl;
-
-                      // Update primary image path to display background cutout
-                      await supabase
-                        .from('garment_images')
-                        .update({ storage_path: processedImageUrl })
-                        .eq('id', primaryImage.id);
-                    }
+                    // Update primary image path to display background cutout
+                    await supabase
+                      .from('garment_images')
+                      .update({ storage_path: processedImageUrl })
+                      .eq('id', primaryImage.id);
                   }
                 }
+
+                // Cleanup
+                if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+                if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
               }
-            } catch (hfErr) {
-              console.error('Hugging Face cloud background removal failed:', hfErr);
+            } catch (pyErr) {
+              console.error('Local Python background removal failed:', pyErr);
             }
           }
         }
