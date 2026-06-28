@@ -1977,6 +1977,151 @@ export default function Home() {
                     </div>
                   </div>
 
+                  {/* COLOR HARMONY PANEL */}
+                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>🎨 Tonal Harmony & Color Palette Analysis</span>
+                    </h3>
+                    <p className="text-zinc-400 text-xs">
+                      Evaluating color wheel pairings, tonal contrast distribution, and classic menswear formulas using your active closet.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      
+                      {/* Dominant Swatches */}
+                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-teal-400">Dominant Wardrobe Swatches</span>
+                        <div className="flex flex-wrap gap-2.5">
+                          {items.length === 0 ? (
+                            <span className="text-zinc-500 text-xs">No garments registered yet.</span>
+                          ) : (
+                            Object.entries(
+                              items.reduce((acc: Record<string, { count: number; hex?: string }>, item) => {
+                                const col = item.color_family;
+                                if (!col) return acc;
+                                if (!acc[col]) acc[col] = { count: 0, hex: item.hex_code || undefined };
+                                acc[col].count += 1;
+                                return acc;
+                              }, {})
+                            )
+                              .sort((a, b) => b[1].count - a[1].count)
+                              .slice(0, 6)
+                              .map(([color, data]) => (
+                                <div key={color} className="flex items-center gap-2 bg-zinc-950/40 border border-zinc-850 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300">
+                                  <span 
+                                    className="w-3.5 h-3.5 rounded-full border border-zinc-800 shrink-0" 
+                                    style={{ backgroundColor: data.hex || '#333' }}
+                                    title={color}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-white truncate max-w-[60px] text-[10px]">{color}</span>
+                                    <span className="text-[8px] text-zinc-500">{data.count} items</span>
+                                  </div>
+                                </div>
+                              ))
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Tonal Contrast Balance */}
+                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-indigo-400">Contrast Distribution</span>
+                        {items.length === 0 ? (
+                          <span className="text-zinc-555 text-xs">No contrast data.</span>
+                        ) : (() => {
+                          const light = items.filter(i => i.tonal_value?.toLowerCase() === 'light').length;
+                          const medium = items.filter(i => i.tonal_value?.toLowerCase() === 'medium').length;
+                          const dark = items.filter(i => i.tonal_value?.toLowerCase() === 'dark').length;
+                          const total = items.length;
+
+                          const pLight = Math.round((light / total) * 100) || 0;
+                          const pMedium = Math.round((medium / total) * 100) || 0;
+                          const pDark = Math.round((dark / total) * 100) || 0;
+
+                          let advice = "Your closet has a balanced tonal weight. You can easily construct high-contrast looks (light shirt with dark trousers) and low-contrast tonal lookbooks.";
+                          if (pDark > 70) {
+                            advice = "Wardrobe is heavily dark-dominant. Focus on mixing fabrics (e.g. textured knits, suede shoes) to introduce depth when low contrast makes styling flat.";
+                          } else if (pLight > 70) {
+                            advice = "Wardrobe is light-dominant. Consider adding navy, charcoal, or chocolate outerwear pieces to anchor your lighter tonal coordinates.";
+                          }
+
+                          return (
+                            <div className="space-y-3">
+                              <div className="flex h-3 rounded-full overflow-hidden w-full border border-zinc-800 bg-zinc-900">
+                                <div className="bg-zinc-100 animate-pulse" style={{ width: `${pLight}%` }} title={`Light: ${pLight}%`} />
+                                <div className="bg-zinc-400" style={{ width: `${pMedium}%` }} title={`Medium: ${pMedium}%`} />
+                                <div className="bg-zinc-800" style={{ width: `${pDark}%` }} title={`Dark: ${pDark}%`} />
+                              </div>
+                              <div className="flex justify-between text-[9px] text-zinc-500 font-bold">
+                                <span>Light: {pLight}%</span>
+                                <span>Medium: {pMedium}%</span>
+                                <span>Dark: {pDark}%</span>
+                              </div>
+                              <p className="text-[10px] text-zinc-400 leading-relaxed font-medium">
+                                {advice}
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Classic Formulas */}
+                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-amber-400">Color Formulas Checklist</span>
+                        {items.length === 0 ? (
+                          <span className="text-zinc-555 text-xs">Awaiting inventory.</span>
+                        ) : (() => {
+                          const families = items.map(i => (i.color_family || '').toLowerCase());
+                          
+                          const formulas = [
+                            {
+                              name: "Earthy Tonal",
+                              colors: ["Olive", "Beige", "White"],
+                              check: families.some(f => f.includes('olive')) &&
+                                     families.some(f => f.match(/beige|cream|khaki/)) &&
+                                     families.some(f => f.includes('white'))
+                            },
+                            {
+                              name: "Modern Navy",
+                              colors: ["Navy/Blue", "Grey", "Brown/Black/Charcoal"],
+                              check: families.some(f => f.includes('navy') || f.includes('blue')) &&
+                                     families.some(f => f.includes('grey') || f.includes('gray')) &&
+                                     families.some(f => f.match(/brown|black|charcoal/))
+                            },
+                            {
+                              name: "High Contrast",
+                              colors: ["Black", "White", "Grey"],
+                              check: families.some(f => f.includes('black')) &&
+                                     families.some(f => f.includes('white')) &&
+                                     families.some(f => f.includes('grey') || f.includes('gray'))
+                            }
+                          ];
+
+                          return (
+                            <div className="space-y-2 max-h-[16vh] overflow-y-auto pr-1">
+                              {formulas.map(f => (
+                                <div key={f.name} className="flex items-center justify-between bg-zinc-950/40 p-2 border border-zinc-850 rounded text-[10px]">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-white">{f.name}</span>
+                                    <span className="text-[8px] text-zinc-500">{f.colors.join(' + ')}</span>
+                                  </div>
+                                  <span className={`px-1.5 py-0.5 rounded font-black text-[8px] uppercase ${
+                                    f.check 
+                                      ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' 
+                                      : 'bg-zinc-800 text-zinc-500'
+                                  }`}>
+                                    {f.check ? '✓ Wearable' : 'Missing Colors'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                    </div>
+                  </div>
+
                   {/* Purging Ledger */}
                   <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
                     <h3 className="text-sm font-bold text-white">🗑️ Wardrobe Culling Suggestions (To Par Down)</h3>
