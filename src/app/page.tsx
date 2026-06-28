@@ -926,6 +926,11 @@ export default function Home() {
                                 group.status === 'failed' ? 'text-rose-500' : 'text-zinc-550'
                               }`}>{group.status.toUpperCase()}</span>
                             </div>
+                            {group.status === 'failed' && group.error && (
+                              <div className="text-[9px] text-rose-400 bg-rose-950/20 border border-rose-500/10 rounded-lg p-2.5 mt-1.5 leading-relaxed font-mono">
+                                ❌ Error: {group.error}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
