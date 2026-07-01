@@ -1210,9 +1210,15 @@ export default function Home() {
                                   body: JSON.stringify({ ids: [validationTarget.id] }),
                                 });
                                 if (res.ok) {
-                                  await fetchItems();
-                                  setValidationTarget(null);
-                                  alert('✨ Background removed successfully!');
+                                  const data = await res.json();
+                                  const itemResult = data.results?.find((r: any) => r.id === validationTarget.id);
+                                  if (itemResult && itemResult.backgroundRemovalSuccess === false) {
+                                    alert(`Cutout Failed: ${itemResult.error || 'Failed to remove background.'}`);
+                                  } else {
+                                    await fetchItems();
+                                    setValidationTarget(null);
+                                    alert('✨ Background removed successfully!');
+                                  }
                                 } else {
                                   const errData = await res.json();
                                   alert(`Cutout Failed: ${errData.error || 'Check server logs.'}`);
@@ -3135,9 +3141,15 @@ export default function Home() {
                           body: JSON.stringify({ ids: [editingItem.id] }),
                         });
                         if (res.ok) {
-                          await fetchItems();
-                          setEditingItem(null);
-                          alert('✨ Background removed successfully!');
+                          const data = await res.json();
+                          const itemResult = data.results?.find((r: any) => r.id === editingItem.id);
+                          if (itemResult && itemResult.backgroundRemovalSuccess === false) {
+                            alert(`Cutout Failed: ${itemResult.error || 'Failed to remove background.'}`);
+                          } else {
+                            await fetchItems();
+                            setEditingItem(null);
+                            alert('✨ Background removed successfully!');
+                          }
                         } else {
                           const errData = await res.json();
                           alert(`Cutout Failed: ${errData.error || 'Check server logs.'}`);

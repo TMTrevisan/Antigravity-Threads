@@ -84,7 +84,7 @@ export async function POST(request: Request) {
         `;
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-2.0-flash',
           contents: [
             ...imageParts,
             promptText,
@@ -361,7 +361,13 @@ export async function POST(request: Request) {
         const candidatesTokens = response.usageMetadata?.candidatesTokenCount || 0;
         await logTelemetry('Gemini_Vision_Ingest', promptTokens, candidatesTokens, { garmentId: id, imagesCount: imagesList.length });
 
-        return { id, success: true };
+        const bgSuccess = (processedImageUrl !== primaryImage.storage_path);
+        return { 
+          id, 
+          success: true, 
+          backgroundRemovalSuccess: bgSuccess,
+          error: bgSuccess ? undefined : 'Background removal failed: both Hugging Face cloud API and local engines failed. Check API token or network.'
+        };
       } catch (err: any) {
         console.error(`Error processing batch item ${id}:`, err);
 
