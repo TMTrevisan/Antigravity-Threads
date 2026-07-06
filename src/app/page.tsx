@@ -124,6 +124,97 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [isSearchingImage, setIsSearchingImage] = useState(false);
   const [isReplacingImage, setIsReplacingImage] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  const uploadImageToGarment = async (file: File) => {
+    if (!editingItem) return;
+    setIsUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('garmentId', editingItem.id);
+      formData.append('file', file);
+      
+      const res = await fetch('/api/items/add-image', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEditingItem({
+          ...editingItem,
+          images: data.images
+        });
+        await fetchItems();
+      } else {
+        alert(`Upload failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      alert(`Error uploading image: ${err.message}`);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const setPrimaryImage = async (imageId: string) => {
+    if (!editingItem) return;
+    setIsUploadingImage(true);
+    try {
+      const res = await fetch('/api/items/set-primary-image', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          garmentId: editingItem.id,
+          imageId
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const primaryUrl = data.images.find((img: any) => img.is_primary_profile)?.storage_path || editingItem.primary_image_url;
+        setEditingItem({
+          ...editingItem,
+          primary_image_url: primaryUrl,
+          images: data.images
+        });
+        await fetchItems();
+      } else {
+        alert(`Failed to set primary: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const deleteGarmentImage = async (imageId: string) => {
+    if (!editingItem) return;
+    setIsUploadingImage(true);
+    try {
+      const res = await fetch('/api/items/delete-image', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          garmentId: editingItem.id,
+          imageId
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEditingItem({
+          ...editingItem,
+          images: data.images
+        });
+        await fetchItems();
+      } else {
+        alert(`Delete failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      alert(`Error deleting: ${err.message}`);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const [visualModal, setVisualModal] = useState<{
     outfitName: string;
     items: Garment[];
@@ -3451,7 +3542,29 @@ export default function Home() {
       {/* EDITING DIALOG MODAL */}
       {editingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
-          <div className="bg-[#1f2833] border border-zinc-800 rounded-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
+          <div 
+            onPaste={async (e) => {
+              const items = e.clipboardData.items;
+              for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                  const file = items[i].getAsFile();
+                  if (file) {
+                    e.preventDefault();
+                    await uploadImageToGarment(file);
+                  }
+                }
+              }
+            }}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={async (e) => {
+              e.preventDefault();
+              const file = e.dataTransfer.files?.[0];
+              if (file && file.type.startsWith('image/')) {
+                await uploadImageToGarment(file);
+              }
+            }}
+            className="bg-[#1f2833] border border-zinc-800 rounded-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto relative"
+          >
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <h3 className="text-sm font-bold text-white">Edit Garment Curation</h3>
               <button onClick={() => setEditingItem(null)} className="text-zinc-400 hover:text-white">✕</button>
@@ -3483,36 +3596,57 @@ export default function Home() {
                   <img src={editingItem.primary_image_url} alt="" className="object-contain w-full h-full" />
                 )}
               </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  setIsSearchingImage(true);
-                  setSearchResults(null);
-                  try {
-                    const res = await fetch('/api/items/search-image', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        brand: editingItem.brand,
-                        description: `${editingItem.sub_category} ${editingItem.notes || ''}`
-                      }),
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      setSearchResults(data.images || []);
-                    } else {
-                      alert(`Search failed: ${data.error || 'Unknown error'}`);
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsSearchingImage(true);
+                    setSearchResults(null);
+                    try {
+                      const res = await fetch('/api/items/search-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          brand: editingItem.brand,
+                          description: `${editingItem.sub_category} ${editingItem.notes || ''}`
+                        }),
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        setSearchResults(data.images || []);
+                      } else {
+                        alert(`Search failed: ${data.error || 'Unknown error'}`);
+                      }
+                    } catch (err: any) {
+                      alert(`Search error: ${err.message}`);
+                    } finally {
+                      setIsSearchingImage(false);
                     }
-                  } catch (err: any) {
-                    alert(`Search error: ${err.message}`);
-                  } finally {
-                    setIsSearchingImage(false);
-                  }
-                }}
-                className="w-full py-2 text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 font-bold rounded-xl transition flex items-center justify-center gap-1.5"
-              >
-                {isSearchingImage ? 'Searching...' : '🔍 Find Manufacturer Photo'}
-              </button>
+                  }}
+                  className="flex-1 py-2 text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 font-bold rounded-xl transition flex items-center justify-center gap-1.5"
+                >
+                  {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
+                </button>
+                
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="manual-photo-upload"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      await uploadImageToGarment(file);
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="manual-photo-upload"
+                  className="flex-1 py-2 text-xs bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  📁 Upload Photo
+                </label>
+              </div>
 
               {/* SEARCH RESULTS PANEL */}
               {searchResults && (
@@ -3587,10 +3721,33 @@ export default function Home() {
               )}
 
               {/* Thumbnails list in editor */}
-              <div className="flex justify-center gap-1.5 overflow-x-auto py-1">
+              <div className="relative flex justify-center gap-1.5 overflow-x-auto py-1">
+                {isUploadingImage && (
+                  <div className="absolute inset-0 bg-black/60 z-30 flex items-center justify-center rounded-lg">
+                    <div className="w-4 h-4 rounded-full border border-teal-400 border-t-transparent animate-spin"></div>
+                  </div>
+                )}
                 {editingItem.images.map((img) => (
-                  <div key={img.id} className="relative w-9 h-9 border border-zinc-800 rounded overflow-hidden bg-black shrink-0">
+                  <div 
+                    key={img.id} 
+                    onClick={() => setPrimaryImage(img.id)}
+                    className={`relative w-9 h-9 border rounded overflow-hidden bg-black shrink-0 cursor-pointer group transition ${
+                      img.is_primary_profile ? 'border-teal-400 ring-1 ring-teal-400' : 'border-zinc-800 hover:border-zinc-600'
+                    }`}
+                  >
                     <img src={img.storage_path} alt="" className="object-cover w-full h-full" />
+                    {!img.is_primary_profile && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteGarmentImage(img.id);
+                        }}
+                        className="absolute top-0.5 right-0.5 w-3 h-3 bg-rose-600 hover:bg-rose-500 rounded-full flex items-center justify-center text-[6px] text-white font-extrabold opacity-0 group-hover:opacity-100 transition"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
