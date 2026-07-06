@@ -31,7 +31,7 @@ async function run() {
     const buffer = Buffer.from(await imgRes.arrayBuffer());
 
     console.log("Sending binary buffer to Hugging Face Inference API...");
-    const res = await fetch("https://api-inference.huggingface.co/models/briaai/RMBG-1.4", {
+    const res = await fetch("https://router.huggingface.co/hf-inference/models/briaai/RMBG-1.4", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${hfToken}`,

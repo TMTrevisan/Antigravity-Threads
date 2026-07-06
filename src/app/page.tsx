@@ -120,6 +120,56 @@ export default function Home() {
   const [isSwiping, setIsSwiping] = useState(false);
   const [currentOutfitIdx, setCurrentOutfitIdx] = useState(0);
   const [continuousSnap, setContinuousSnap] = useState(false);
+  const [cutoutProgress, setCutoutProgress] = useState<string | null>(null);
+
+  const runClientSideCutout = async (garmentId: string, storagePath: string) => {
+    setCutoutProgress('Initializing AI engine...');
+    try {
+      setCutoutProgress('Loading AI cutout model (this may take a moment on first run)...');
+      const { pipeline, RawImage } = await import('@huggingface/transformers');
+      
+      const segmentator = await pipeline('image-segmentation', 'briaai/RMBG-1.4');
+      
+      setCutoutProgress('Fetching original garment image...');
+      const response = await fetch(storagePath);
+      if (!response.ok) throw new Error('Failed to retrieve original image from storage.');
+      const imageBlob = await response.blob();
+      
+      setCutoutProgress('Processing cutout (segmenting background)...');
+      const rawImg = await RawImage.fromBlob(imageBlob);
+      const output = await segmentator(rawImg) as any;
+      
+      setCutoutProgress('Generating transparent image canvas...');
+      const canvas = output[0].mask.toCanvas();
+      
+      setCutoutProgress('Uploading transparent cutout to closet...');
+      const uploadBlob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((blob: Blob | null) => resolve(blob), 'image/png');
+      });
+      
+      if (!uploadBlob) throw new Error('Canvas rendering failed.');
+      
+      const formData = new FormData();
+      formData.append('garmentId', garmentId);
+      formData.append('file', new File([uploadBlob], 'cutout.png', { type: 'image/png' }));
+      
+      const uploadRes = await fetch('/api/upload/cutout', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed.');
+      
+      await fetchItems();
+      alert('✨ Background removed successfully!');
+    } catch (err: any) {
+      console.error('Client-side cutout error:', err);
+      alert(`AI Cutout Failed: ${err.message || err}`);
+    } finally {
+      setCutoutProgress(null);
+    }
+  };
 
   // Telemetry Dashboard state
   const [telemetry, setTelemetry] = useState<TelemetryStats | null>(null);
@@ -1203,30 +1253,13 @@ export default function Home() {
                           <button
                             type="button"
                             onClick={async () => {
-                              try {
-                                const res = await fetch('/api/ingest/batch-process', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ ids: [validationTarget.id] }),
-                                });
-                                if (res.ok) {
-                                  const data = await res.json();
-                                  const itemResult = data.results?.find((r: any) => r.id === validationTarget.id);
-                                  if (itemResult && itemResult.backgroundRemovalSuccess === false) {
-                                    alert(`Cutout Failed: ${itemResult.error || 'Failed to remove background.'}`);
-                                  } else {
-                                    await fetchItems();
-                                    setValidationTarget(null);
-                                    alert('✨ Background removed successfully!');
-                                  }
-                                } else {
-                                  const errData = await res.json();
-                                  alert(`Cutout Failed: ${errData.error || 'Check server logs.'}`);
-                                }
-                              } catch (err: any) {
-                                console.error('Failed to trigger background removal:', err);
-                                alert(`Network Error: ${err.message}`);
+                              const primaryImg = validationTarget.images?.find((img: any) => img.is_primary_profile) || validationTarget.images?.[0] || { storage_path: validationTarget.primary_image_url };
+                              if (!primaryImg || !primaryImg.storage_path) {
+                                alert('No image found for this garment.');
+                                return;
                               }
+                              setValidationTarget(null);
+                              await runClientSideCutout(validationTarget.id, primaryImg.storage_path);
                             }}
                             className="px-4 py-2 bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 rounded-lg text-xs font-bold transition"
                           >
@@ -2923,6 +2956,25 @@ export default function Home() {
         </div>
       )}
 
+      {/* CLIENT-SIDE CUTOUT PROGRESS OVERLAY */}
+      {cutoutProgress && (
+        <div className="fixed inset-0 z-55 flex flex-col items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#1f2833] border border-teal-500/20 rounded-2xl p-8 max-w-sm w-full text-center space-y-6 shadow-2xl shadow-teal-500/5">
+            <div className="relative w-16 h-16 mx-auto">
+              <div className="absolute inset-0 rounded-full border-4 border-zinc-800"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-teal-400 border-t-transparent animate-spin"></div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold text-white tracking-wide uppercase">AI Cutout Processing</h3>
+              <p className="text-xs text-teal-400 font-medium animate-pulse">{cutoutProgress}</p>
+            </div>
+            <p className="text-[10px] text-zinc-500 leading-normal">
+              Running background removal client-side using Transformers.js. The first execution will download the model weights (approx. 40MB). Subsequent cutouts are instant.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* EDITING DIALOG MODAL */}
       {editingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
@@ -3133,33 +3185,13 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={async () => {
-                      setIsSavingEdit(true);
-                      try {
-                        const res = await fetch('/api/ingest/batch-process', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ ids: [editingItem.id] }),
-                        });
-                        if (res.ok) {
-                          const data = await res.json();
-                          const itemResult = data.results?.find((r: any) => r.id === editingItem.id);
-                          if (itemResult && itemResult.backgroundRemovalSuccess === false) {
-                            alert(`Cutout Failed: ${itemResult.error || 'Failed to remove background.'}`);
-                          } else {
-                            await fetchItems();
-                            setEditingItem(null);
-                            alert('✨ Background removed successfully!');
-                          }
-                        } else {
-                          const errData = await res.json();
-                          alert(`Cutout Failed: ${errData.error || 'Check server logs.'}`);
-                        }
-                      } catch (err: any) {
-                        console.error(err);
-                        alert(`Network Error: ${err.message}`);
-                      } finally {
-                        setIsSavingEdit(false);
+                      const primaryImg = editingItem.images?.find((img: any) => img.is_primary_profile) || editingItem.images?.[0] || { storage_path: editingItem.primary_image_url };
+                      if (!primaryImg || !primaryImg.storage_path) {
+                        alert('No image found for this garment.');
+                        return;
                       }
+                      setEditingItem(null);
+                      await runClientSideCutout(editingItem.id, primaryImg.storage_path);
                     }}
                     className="px-4 py-2 bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 rounded-xl text-xs font-bold transition flex items-center gap-1"
                   >
