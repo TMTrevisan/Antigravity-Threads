@@ -1244,45 +1244,43 @@ export default function Home() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="flex flex-col items-center justify-center p-4 bg-zinc-950/40 rounded-xl border border-zinc-850 space-y-4">
-                        <div className="relative w-44 h-44 flex flex-col items-center justify-center group rounded-lg overflow-hidden bg-black">
+                        <div className="relative w-44 h-44 flex flex-col items-center justify-center rounded-lg overflow-hidden bg-black">
                           <img 
                             src={validationTarget.primary_image_url || ''} 
                             alt="Garment preview" 
                             className="object-contain w-full h-full mix-blend-lighten filter saturate-[1.1] contrast-[1.05]"
                           />
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-2">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                setIsSearchingImage(true);
-                                setSearchResults(null);
-                                try {
-                                  const res = await fetch('/api/items/search-image', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      brand: validationTarget.brand,
-                                      description: `${validationTarget.sub_category} ${validationTarget.notes || ''}`
-                                    }),
-                                  });
-                                  const data = await res.json();
-                                  if (res.ok) {
-                                    setSearchResults(data.images || []);
-                                  } else {
-                                    alert(`Search failed: ${data.error || 'Unknown error'}`);
-                                  }
-                                } catch (err: any) {
-                                  alert(`Search error: ${err.message}`);
-                                } finally {
-                                  setIsSearchingImage(false);
-                                }
-                              }}
-                              className="w-full py-1 text-[9px] bg-teal-500/80 text-black font-bold rounded hover:bg-teal-400 transition"
-                            >
-                              {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
-                            </button>
-                          </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setIsSearchingImage(true);
+                            setSearchResults(null);
+                            try {
+                              const res = await fetch('/api/items/search-image', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  brand: validationTarget.brand,
+                                  description: `${validationTarget.sub_category} ${validationTarget.notes || ''}`
+                                }),
+                              });
+                              const data = await res.json();
+                              if (res.ok) {
+                                setSearchResults(data.images || []);
+                              } else {
+                                alert(`Search failed: ${data.error || 'Unknown error'}`);
+                              }
+                            } catch (err: any) {
+                              alert(`Search error: ${err.message}`);
+                            } finally {
+                              setIsSearchingImage(false);
+                            }
+                          }}
+                          className="w-full py-2 text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 font-bold rounded-xl transition flex items-center justify-center gap-1.5"
+                        >
+                          {isSearchingImage ? 'Searching...' : '🔍 Find Manufacturer Photo'}
+                        </button>
 
                         {/* SEARCH RESULTS PANEL IN VALIDATION */}
                         {searchResults && (
@@ -3480,43 +3478,41 @@ export default function Home() {
               }
             }} className="space-y-3">
               
-              <div className="relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-zinc-700 bg-black flex flex-col items-center justify-center group">
+              <div className="relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-zinc-700 bg-black flex flex-col items-center justify-center">
                 {editingItem.primary_image_url && (
                   <img src={editingItem.primary_image_url} alt="" className="object-contain w-full h-full" />
                 )}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setIsSearchingImage(true);
-                      setSearchResults(null);
-                      try {
-                        const res = await fetch('/api/items/search-image', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            brand: editingItem.brand,
-                            description: `${editingItem.sub_category} ${editingItem.notes || ''}`
-                          }),
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          setSearchResults(data.images || []);
-                        } else {
-                          alert(`Search failed: ${data.error || 'Unknown error'}`);
-                        }
-                      } catch (err: any) {
-                        alert(`Search error: ${err.message}`);
-                      } finally {
-                        setIsSearchingImage(false);
-                      }
-                    }}
-                    className="w-full py-1 text-[9px] bg-teal-500/80 text-black font-bold rounded hover:bg-teal-400 transition"
-                  >
-                    {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
-                  </button>
-                </div>
               </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsSearchingImage(true);
+                  setSearchResults(null);
+                  try {
+                    const res = await fetch('/api/items/search-image', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        brand: editingItem.brand,
+                        description: `${editingItem.sub_category} ${editingItem.notes || ''}`
+                      }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      setSearchResults(data.images || []);
+                    } else {
+                      alert(`Search failed: ${data.error || 'Unknown error'}`);
+                    }
+                  } catch (err: any) {
+                    alert(`Search error: ${err.message}`);
+                  } finally {
+                    setIsSearchingImage(false);
+                  }
+                }}
+                className="w-full py-2 text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 font-bold rounded-xl transition flex items-center justify-center gap-1.5"
+              >
+                {isSearchingImage ? 'Searching...' : '🔍 Find Manufacturer Photo'}
+              </button>
 
               {/* SEARCH RESULTS PANEL */}
               {searchResults && (
