@@ -121,6 +121,9 @@ export default function Home() {
   const [currentOutfitIdx, setCurrentOutfitIdx] = useState(0);
   const [continuousSnap, setContinuousSnap] = useState(false);
   const [cutoutProgress, setCutoutProgress] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+  const [isSearchingImage, setIsSearchingImage] = useState(false);
+  const [isReplacingImage, setIsReplacingImage] = useState(false);
 
   const runClientSideCutout = async (garmentId: string, storagePath: string) => {
     setCutoutProgress('Initializing AI engine...');
@@ -2899,6 +2902,10 @@ export default function Home() {
           )}
 
         </section>
+
+        <footer className="mt-16 border-t border-zinc-850 pt-8 pb-12 text-center text-[10px] text-zinc-500">
+          <p>© 2026 Antigravity Threads • v2.31.0 Release</p>
+        </footer>
       </main>
 
       {/* TELEMETRY DRAWER */}
@@ -3005,11 +3012,115 @@ export default function Home() {
               }
             }} className="space-y-3">
               
-              <div className="relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-zinc-700 bg-black flex items-center justify-center">
+              <div className="relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-zinc-700 bg-black flex flex-col items-center justify-center group">
                 {editingItem.primary_image_url && (
                   <img src={editingItem.primary_image_url} alt="" className="object-contain w-full h-full" />
                 )}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsSearchingImage(true);
+                      setSearchResults(null);
+                      try {
+                        const res = await fetch('/api/items/search-image', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            brand: editingItem.brand,
+                            description: `${editingItem.sub_category} ${editingItem.notes || ''}`
+                          }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setSearchResults(data.images || []);
+                        } else {
+                          alert(`Search failed: ${data.error || 'Unknown error'}`);
+                        }
+                      } catch (err: any) {
+                        alert(`Search error: ${err.message}`);
+                      } finally {
+                        setIsSearchingImage(false);
+                      }
+                    }}
+                    className="w-full py-1 text-[9px] bg-teal-500/80 text-black font-bold rounded hover:bg-teal-400 transition"
+                  >
+                    {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
+                  </button>
+                </div>
               </div>
+
+              {/* SEARCH RESULTS PANEL */}
+              {searchResults && (
+                <div className="border border-zinc-800 rounded-xl p-3 bg-zinc-950/60 space-y-3 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] uppercase font-bold text-teal-400">Web Search Results</h4>
+                    <button
+                      type="button"
+                      onClick={() => setSearchResults(null)}
+                      className="text-zinc-500 hover:text-white text-xs"
+                    >
+                      ✕ Close
+                    </button>
+                  </div>
+                  
+                  {searchResults.length === 0 ? (
+                    <p className="text-[10px] text-zinc-500 text-center py-2">No matching manufacturer photos found.</p>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
+                      {searchResults.map((img: any, idx: number) => (
+                        <div
+                          key={idx}
+                          onClick={async () => {
+                            if (isReplacingImage) return;
+                            setIsReplacingImage(true);
+                            try {
+                              const res = await fetch('/api/items/search-image', {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  garmentId: editingItem.id,
+                                  imageUrl: img.url
+                                }),
+                              });
+                              const data = await res.json();
+                              if (res.ok) {
+                                setEditingItem({
+                                  ...editingItem,
+                                  primary_image_url: data.url,
+                                  images: editingItem.images.map((gImg: any) =>
+                                    gImg.is_primary_profile ? { ...gImg, storage_path: data.url } : gImg
+                                  )
+                                });
+                                await fetchItems();
+                                setSearchResults(null);
+                                alert('✨ Garment photo successfully replaced!');
+                              } else {
+                                alert(`Failed to replace photo: ${data.error || 'Unknown error'}`);
+                              }
+                            } catch (err: any) {
+                              alert(`Error replacing photo: ${err.message}`);
+                            } finally {
+                              setIsReplacingImage(false);
+                            }
+                          }}
+                          className="relative aspect-square border border-zinc-800 rounded-lg overflow-hidden bg-black cursor-pointer hover:border-teal-400 transition group"
+                        >
+                          <img src={img.url} alt="" className="object-contain w-full h-full" />
+                          <div className="absolute inset-x-0 bottom-0 bg-black/80 text-[7px] text-zinc-400 px-1 py-0.5 truncate text-center group-hover:text-teal-400">
+                            {img.source}
+                          </div>
+                          {isReplacingImage && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] text-teal-400 animate-pulse">
+                              Replacing...
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Thumbnails list in editor */}
               <div className="flex justify-center gap-1.5 overflow-x-auto py-1">

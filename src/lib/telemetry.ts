@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export type TokenService = 'Gemini_Vision_Ingest' | 'Gemini_Stylist_Engine' | 'Pirate_Weather_API';
+export type TokenService = 'Gemini_Vision_Ingest' | 'Gemini_Stylist_Engine' | 'Pirate_Weather_API' | 'Gemini_Search_Image';
 
 /**
  * Logs token usage and estimated API cost to the billing_and_token_ledger table.
