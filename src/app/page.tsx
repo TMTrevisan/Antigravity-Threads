@@ -300,7 +300,7 @@ export default function Home() {
       setCutoutProgress('Loading AI cutout model (this may take a moment on first run)...');
       const { pipeline, RawImage } = await import('@huggingface/transformers');
       
-      const segmentator = await pipeline('image-segmentation', 'briaai/RMBG-1.4');
+      const segmentator = await pipeline('image-segmentation', 'Xenova/RMBG-1.4');
       
       setCutoutProgress('Fetching original garment image...');
       const response = await fetch(storagePath);
