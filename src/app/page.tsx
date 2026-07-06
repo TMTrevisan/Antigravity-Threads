@@ -124,6 +124,84 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [isSearchingImage, setIsSearchingImage] = useState(false);
   const [isReplacingImage, setIsReplacingImage] = useState(false);
+  const [visualModal, setVisualModal] = useState<{
+    outfitName: string;
+    items: Garment[];
+    tab: 'collage' | 'generative' | 'tryon';
+    genUrl?: string;
+    loading?: boolean;
+    loadingMsg?: string;
+    personImage?: string | null;
+  } | null>(null);
+
+  const drawOutfitCollage = (canvas: HTMLCanvasElement, outfitItems: Garment[]) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.fillStyle = '#0b0c10';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.strokeStyle = 'rgba(102, 252, 241, 0.04)';
+    ctx.lineWidth = 1.5;
+    for (let x = 0; x < canvas.width; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
+    let loadedCount = 0;
+    const itemsToDraw = outfitItems.filter(item => item.primary_image_url);
+    
+    if (itemsToDraw.length === 0) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '14px monospace';
+      ctx.fillText('No images available for collage.', 50, canvas.height / 2);
+      return;
+    }
+
+    itemsToDraw.forEach(item => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = item.primary_image_url!;
+      img.onload = () => {
+        let x = 0, y = 0, w = 240, h = 240;
+        const cat = item.category.toLowerCase();
+        
+        if (cat.includes('top') || cat.includes('outerwear') || cat.includes('tailoring')) {
+          x = (canvas.width - w) / 2;
+          y = 50;
+        } else if (cat.includes('bottom')) {
+          x = (canvas.width - w) / 2;
+          y = 250;
+        } else if (cat.includes('footwear')) {
+          x = (canvas.width - w) / 2;
+          y = 470;
+        } else {
+          x = 100;
+          y = 100 + loadedCount * 150;
+        }
+
+        ctx.drawImage(img, x, y, w, h);
+        
+        loadedCount++;
+        if (loadedCount === itemsToDraw.length) {
+          ctx.fillStyle = 'rgba(102, 252, 241, 0.6)';
+          ctx.font = 'bold 10px monospace';
+          ctx.fillText('ANTIGRAVITY THREADS • OUTFIT COLLAGE', 20, canvas.height - 20);
+        }
+      };
+      img.onerror = () => {
+        loadedCount++;
+      };
+    });
+  };
 
   const runClientSideCutout = async (garmentId: string, storagePath: string) => {
     setCutoutProgress('Initializing AI engine...');
@@ -1165,14 +1243,118 @@ export default function Home() {
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="flex flex-col items-center justify-center p-4 bg-zinc-950/40 rounded-xl border border-zinc-850">
-                        <div className="relative w-44 h-44 flex items-center justify-center">
+                      <div className="flex flex-col items-center justify-center p-4 bg-zinc-950/40 rounded-xl border border-zinc-850 space-y-4">
+                        <div className="relative w-44 h-44 flex flex-col items-center justify-center group rounded-lg overflow-hidden bg-black">
                           <img 
                             src={validationTarget.primary_image_url || ''} 
                             alt="Garment preview" 
                             className="object-contain w-full h-full mix-blend-lighten filter saturate-[1.1] contrast-[1.05]"
                           />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setIsSearchingImage(true);
+                                setSearchResults(null);
+                                try {
+                                  const res = await fetch('/api/items/search-image', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      brand: validationTarget.brand,
+                                      description: `${validationTarget.sub_category} ${validationTarget.notes || ''}`
+                                    }),
+                                  });
+                                  const data = await res.json();
+                                  if (res.ok) {
+                                    setSearchResults(data.images || []);
+                                  } else {
+                                    alert(`Search failed: ${data.error || 'Unknown error'}`);
+                                  }
+                                } catch (err: any) {
+                                  alert(`Search error: ${err.message}`);
+                                } finally {
+                                  setIsSearchingImage(false);
+                                }
+                              }}
+                              className="w-full py-1 text-[9px] bg-teal-500/80 text-black font-bold rounded hover:bg-teal-400 transition"
+                            >
+                              {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
+                            </button>
+                          </div>
                         </div>
+
+                        {/* SEARCH RESULTS PANEL IN VALIDATION */}
+                        {searchResults && (
+                          <div className="w-full border border-zinc-800 rounded-xl p-3 bg-zinc-950/60 space-y-3 animate-fade-in">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-[10px] uppercase font-bold text-teal-400">Web Search Results</h4>
+                              <button
+                                type="button"
+                                onClick={() => setSearchResults(null)}
+                                className="text-zinc-500 hover:text-white text-xs"
+                              >
+                                ✕ Close
+                              </button>
+                            </div>
+                            
+                            {searchResults.length === 0 ? (
+                              <p className="text-[10px] text-zinc-500 text-center py-2">No matching manufacturer photos found.</p>
+                            ) : (
+                              <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
+                                {searchResults.map((img: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    onClick={async () => {
+                                      if (isReplacingImage) return;
+                                      setIsReplacingImage(true);
+                                      try {
+                                        const res = await fetch('/api/items/search-image', {
+                                          method: 'PUT',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            garmentId: validationTarget.id,
+                                            imageUrl: img.url
+                                          }),
+                                        });
+                                        const data = await res.json();
+                                        if (res.ok) {
+                                          setValidationTarget({
+                                            ...validationTarget,
+                                            primary_image_url: data.url,
+                                            images: validationTarget.images.map((gImg: any) =>
+                                              gImg.is_primary_profile ? { ...gImg, storage_path: data.url } : gImg
+                                            )
+                                          });
+                                          await fetchItems();
+                                          setSearchResults(null);
+                                          alert('✨ Garment photo successfully replaced!');
+                                        } else {
+                                          alert(`Failed to replace photo: ${data.error || 'Unknown error'}`);
+                                        }
+                                      } catch (err: any) {
+                                        alert(`Error replacing photo: ${err.message}`);
+                                      } finally {
+                                        setIsReplacingImage(false);
+                                      }
+                                    }}
+                                    className="relative aspect-square border border-zinc-800 rounded-lg overflow-hidden bg-black cursor-pointer hover:border-teal-400 transition group"
+                                  >
+                                    <img src={img.url} alt="" className="object-contain w-full h-full" />
+                                    <div className="absolute inset-x-0 bottom-0 bg-black/80 text-[7px] text-zinc-400 px-1 py-0.5 truncate text-center group-hover:text-teal-400">
+                                      {img.source}
+                                    </div>
+                                    {isReplacingImage && (
+                                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] text-teal-400 animate-pulse">
+                                        Replacing...
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         
                         {/* Secondary thumbnails view */}
                         <div className="flex items-center gap-1.5 mt-4 overflow-x-auto max-w-xs py-1">
@@ -2671,7 +2853,19 @@ export default function Home() {
                                 ))}
                               </div>
 
-                              <p className="text-xs text-zinc-400 leading-relaxed">{outfit.styling_reasoning}</p>
+                              <p className="text-xs text-zinc-400 leading-relaxed mb-3">{outfit.styling_reasoning}</p>
+                              
+                              <button
+                                type="button"
+                                onClick={() => setVisualModal({
+                                  outfitName: outfit.name,
+                                  items: outfitItems,
+                                  tab: 'collage'
+                                })}
+                                className="w-full py-2 bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                              >
+                                🎨 View Outfit Visuals
+                              </button>
                             </div>
                           </div>
                         );
@@ -2978,6 +3172,280 @@ export default function Home() {
             <p className="text-[10px] text-zinc-500 leading-normal">
               Running background removal client-side using Transformers.js. The first execution will download the model weights (approx. 40MB). Subsequent cutouts are instant.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* OUTFIT VISUALS MODAL (COLLAGE / GENERATIVE / TRY-ON) */}
+      {visualModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#1f2833] border border-zinc-800 rounded-3xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl shadow-teal-500/5">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-white">Outfit Visualizer</h3>
+                <p className="text-[10px] text-zinc-400 mt-0.5">{visualModal.outfitName}</p>
+              </div>
+              <button 
+                onClick={() => setVisualModal(null)} 
+                className="text-zinc-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Visual Tabs */}
+            <div className="flex border-b border-zinc-850">
+              <button
+                type="button"
+                onClick={() => setVisualModal({ ...visualModal, tab: 'collage' })}
+                className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 ${
+                  visualModal.tab === 'collage' 
+                    ? 'border-teal-400 text-teal-400' 
+                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                🖼️ Option A: Collage
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisualModal({ ...visualModal, tab: 'generative' })}
+                className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 ${
+                  visualModal.tab === 'generative' 
+                    ? 'border-teal-400 text-teal-400' 
+                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                ✨ Option B: AI Flat-lay
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisualModal({ ...visualModal, tab: 'tryon' })}
+                className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 ${
+                  visualModal.tab === 'tryon' 
+                    ? 'border-teal-400 text-teal-400' 
+                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                👤 AI Virtual Try-On
+              </button>
+            </div>
+
+            {/* TAB CONTENT */}
+            <div className="py-2">
+              {visualModal.tab === 'collage' && (
+                <div className="space-y-4 text-center">
+                  <canvas
+                    ref={(canvas) => {
+                      if (canvas) {
+                        drawOutfitCollage(canvas, visualModal.items);
+                      }
+                    }}
+                    width={600}
+                    height={800}
+                    className="mx-auto max-h-[50vh] w-full object-contain border border-zinc-800 rounded-xl bg-zinc-950 shadow-inner"
+                  />
+                  <p className="text-[10px] text-zinc-500">
+                    Stitched locally using garment cutout layers. Instant, free, and lightweight.
+                  </p>
+                </div>
+              )}
+
+              {visualModal.tab === 'generative' && (
+                <div className="space-y-4 text-center">
+                  {visualModal.loading ? (
+                    <div className="h-64 flex flex-col items-center justify-center space-y-3 bg-zinc-950/40 rounded-xl border border-zinc-850">
+                      <div className="w-8 h-8 rounded-full border-2 border-teal-400 border-t-transparent animate-spin"></div>
+                      <p className="text-xs text-teal-400 animate-pulse">{visualModal.loadingMsg || 'Generating...'}</p>
+                    </div>
+                  ) : visualModal.genUrl ? (
+                    <div className="space-y-4">
+                      <img 
+                        src={visualModal.genUrl} 
+                        alt="AI Generated Outfit" 
+                        className="mx-auto max-h-[50vh] object-contain border border-zinc-800 rounded-xl shadow-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVisualModal({ ...visualModal, genUrl: undefined })}
+                        className="px-4 py-1.5 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded-lg text-xs font-semibold"
+                      >
+                        Regenerate
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-64 flex flex-col items-center justify-center space-y-4 bg-zinc-950/40 rounded-xl border border-zinc-850 p-6">
+                      <p className="text-xs text-zinc-400 max-w-sm leading-normal">
+                        Generate a professional editorial flat-lay photo of this outfit using Stable Diffusion XL via Hugging Face.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setVisualModal({ ...visualModal, loading: true, loadingMsg: 'Prompting Stable Diffusion...' });
+                          try {
+                            const desc = visualModal.items
+                              .map(i => `${i.color_family} ${i.sub_category} by ${i.brand || 'boutique'}`)
+                              .join(', and a ');
+                            const prompt = `A professional high-end editorial flat-lay men's fashion photo of: a ${desc}. Flat lay arrangement, studio lighting, clean solid neutral background, high fashion asset.`;
+                            
+                            const res = await fetch('/api/outfits/generate-image', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ prompt }),
+                            });
+                            const data = await res.json();
+                            if (res.ok) {
+                              setVisualModal({ ...visualModal, genUrl: data.url, loading: false });
+                            } else {
+                              alert(`Generation failed: ${data.error || 'Check server logs.'}`);
+                              setVisualModal({ ...visualModal, loading: false });
+                            }
+                          } catch (err: any) {
+                            alert(`Error generating image: ${err.message}`);
+                            setVisualModal({ ...visualModal, loading: false });
+                          }
+                        }}
+                        className="px-5 py-2 bg-teal-400 text-black hover:bg-teal-300 rounded-xl text-xs font-bold transition"
+                      >
+                        ✨ Generate AI Flat-lay
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {visualModal.tab === 'tryon' && (
+                <div className="space-y-4">
+                  {visualModal.loading ? (
+                    <div className="h-64 flex flex-col items-center justify-center space-y-3 bg-zinc-950/40 rounded-xl border border-zinc-850">
+                      <div className="w-8 h-8 rounded-full border-2 border-teal-400 border-t-transparent animate-spin"></div>
+                      <p className="text-xs text-teal-400 animate-pulse">{visualModal.loadingMsg || 'Processing Virtual Try-On...'}</p>
+                    </div>
+                  ) : visualModal.genUrl ? (
+                    <div className="text-center space-y-4">
+                      <img 
+                        src={visualModal.genUrl} 
+                        alt="Try-On Result" 
+                        className="mx-auto max-h-[50vh] object-contain border border-zinc-800 rounded-xl shadow-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVisualModal({ ...visualModal, genUrl: undefined })}
+                        className="px-4 py-1.5 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded-lg text-xs font-semibold"
+                      >
+                        Try Another Item
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Left side: Upload portrait */}
+                      <div className="border border-dashed border-zinc-800 bg-zinc-950/30 rounded-xl p-4 flex flex-col items-center justify-center text-center min-h-[250px]">
+                        {visualModal.personImage ? (
+                          <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-black flex items-center justify-center">
+                            <img src={visualModal.personImage} alt="User Portrait" className="object-contain w-full h-full" />
+                            <button
+                              type="button"
+                              onClick={() => setVisualModal({ ...visualModal, personImage: null })}
+                              className="absolute top-2 right-2 bg-black/70 hover:bg-black p-1.5 rounded-full text-xs text-zinc-400 hover:text-white"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <span className="text-2xl">👤</span>
+                            <div className="space-y-1">
+                              <p className="text-xs font-bold text-white">Upload Your Photo</p>
+                              <p className="text-[9px] text-zinc-500">Provide a clear full-body portrait image</p>
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              id="vton-file"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = () => {
+                                    setVisualModal({ ...visualModal, personImage: reader.result as string });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor="vton-file"
+                              className="inline-block px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded-lg text-[10px] cursor-pointer"
+                            >
+                              Choose File
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right side: Select item & run */}
+                      <div className="border border-zinc-850 bg-zinc-950/20 rounded-xl p-4 flex flex-col justify-between min-h-[250px]">
+                        <div className="space-y-3">
+                          <h4 className="text-[10px] uppercase font-bold text-zinc-400">Target Garment</h4>
+                          <div className="flex gap-3 items-center border border-zinc-850 bg-zinc-950/40 p-2.5 rounded-lg">
+                            <div className="w-12 h-12 bg-black rounded overflow-hidden flex-shrink-0">
+                              <img src={visualModal.items[0]?.primary_image_url || ''} alt="" className="object-cover w-full h-full" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-white truncate max-w-[150px]">{visualModal.items[0]?.sub_category}</p>
+                              <p className="text-[9px] text-zinc-500">{visualModal.items[0]?.brand || 'Boutique'}</p>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-zinc-500 leading-normal">
+                            Using IDM-VTON diffusion models to drape your garment onto your uploaded portrait.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={!visualModal.personImage}
+                          onClick={async () => {
+                            if (!visualModal.personImage) return;
+                            setVisualModal({ ...visualModal, loading: true, loadingMsg: 'Draping clothing via AI...' });
+                            try {
+                              const res = await fetch('/api/outfits/virtual-try-on', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  personImage: visualModal.personImage,
+                                  garmentImage: visualModal.items[0]?.primary_image_url,
+                                  category: visualModal.items[0]?.category.toLowerCase()
+                                }),
+                              });
+                              const data = await res.json();
+                              if (res.ok) {
+                                setVisualModal({ ...visualModal, genUrl: data.url, loading: false });
+                                if (data.isMock) {
+                                  alert(`Demo Try-On Output:\n\n${data.message}`);
+                                }
+                              } else {
+                                alert(`Try-on failed: ${data.error || 'Check server logs.'}`);
+                                setVisualModal({ ...visualModal, loading: false });
+                              }
+                            } catch (err: any) {
+                              alert(`Try-on error: ${err.message}`);
+                              setVisualModal({ ...visualModal, loading: false });
+                            }
+                          }}
+                          className={`w-full py-2 rounded-xl text-xs font-bold transition ${
+                            visualModal.personImage 
+                              ? 'bg-teal-400 text-black hover:bg-teal-300' 
+                              : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                          }`}
+                        >
+                          ✨ Run Try-On
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
