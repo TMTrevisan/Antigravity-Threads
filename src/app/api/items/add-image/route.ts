@@ -3,26 +3,62 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const garmentId = formData.get('garmentId') as string | null;
-    const file = formData.get('file') as File | null;
+    let garmentId: string | null = null;
+    let buffer: Buffer | null = null;
+    let contentType = 'image/jpeg';
+    let fileExtension = 'jpg';
 
-    if (!garmentId) {
-      return NextResponse.json({ error: 'Missing garmentId.' }, { status: 400 });
+    const reqContentType = request.headers.get('content-type') || '';
+
+    if (reqContentType.includes('application/json')) {
+      const body = await request.json();
+      garmentId = body.garmentId;
+      const imageUrl = body.imageUrl;
+
+      if (!garmentId || !imageUrl) {
+        return NextResponse.json({ error: 'Missing garmentId or imageUrl.' }, { status: 400 });
+      }
+
+      // Download the image
+      const imageResponse = await fetch(imageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+          'Accept': 'image/jpeg,image/png,image/webp,image/*;q=0.8'
+        }
+      });
+
+      if (!imageResponse.ok) {
+        return NextResponse.json({ error: `Failed to download image: Status ${imageResponse.status}` }, { status: 400 });
+      }
+
+      contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+      const blob = await imageResponse.blob();
+      buffer = Buffer.from(await blob.arrayBuffer());
+      fileExtension = contentType.split('/').pop() || 'jpg';
+    } else {
+      const formData = await request.formData();
+      garmentId = formData.get('garmentId') as string | null;
+      const file = formData.get('file') as File | null;
+
+      if (!garmentId) {
+        return NextResponse.json({ error: 'Missing garmentId.' }, { status: 400 });
+      }
+      if (!file) {
+        return NextResponse.json({ error: 'Missing file.' }, { status: 400 });
+      }
+
+      const bytes = await file.arrayBuffer();
+      buffer = Buffer.from(bytes);
+
+      // Validate image format
+      if (!file.type.startsWith('image/')) {
+        return NextResponse.json({ error: 'Security Violation: File is not an image.' }, { status: 400 });
+      }
+
+      contentType = file.type;
+      fileExtension = (file.name.split('.').pop() || 'jpg').toLowerCase();
     }
-    if (!file) {
-      return NextResponse.json({ error: 'Missing file.' }, { status: 400 });
-    }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    // Validate image format
-    if (!file.type.startsWith('image/')) {
-      return NextResponse.json({ error: 'Security Violation: File is not an image.' }, { status: 400 });
-    }
-
-    const fileExtension = (file.name.split('.').pop() || 'jpg').toLowerCase();
     const fileName = `${garmentId}-add-${Date.now()}.${fileExtension}`;
     const filePath = `raw/${fileName}`;
 
@@ -30,7 +66,7 @@ export async function POST(request: Request) {
     const { error: uploadError } = await supabase.storage
       .from('wardrobe-images')
       .upload(filePath, buffer, {
-        contentType: file.type,
+        contentType,
         upsert: true,
       });
 

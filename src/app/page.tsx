@@ -374,6 +374,63 @@ export default function Home() {
     fetchTelemetry();
     fetchMeasurements();
   }, []);
+  // Global clipboard paste helper for existing garments in Edit Modal
+  useEffect(() => {
+    const handleGlobalPaste = async (e: ClipboardEvent) => {
+      if (!editingItem) return;
+
+      // 1. Check for image files in clipboard
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            const file = items[i].getAsFile();
+            if (file) {
+              e.preventDefault();
+              await uploadImageToGarment(file);
+              return;
+            }
+          }
+        }
+      }
+
+      // 2. Check for copied image URL in clipboard text
+      const pastedText = e.clipboardData?.getData('text') || '';
+      if (pastedText.trim().startsWith('http://') || pastedText.trim().startsWith('https://')) {
+        e.preventDefault();
+        setIsUploadingImage(true);
+        try {
+          const res = await fetch('/api/items/add-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              garmentId: editingItem.id,
+              imageUrl: pastedText.trim()
+            })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            setEditingItem({
+              ...editingItem,
+              images: data.images
+            });
+            await fetchItems();
+          } else {
+            alert(`URL paste failed: ${data.error || 'Unknown error'}`);
+          }
+        } catch (err: any) {
+          alert(`URL paste error: ${err.message}`);
+        } finally {
+          setIsUploadingImage(false);
+        }
+      }
+    };
+
+    document.addEventListener('paste', handleGlobalPaste);
+    return () => {
+      document.removeEventListener('paste', handleGlobalPaste);
+    };
+  }, [editingItem]);
 
   const fetchItems = async () => {
     setLoadingItems(true);
@@ -3543,18 +3600,6 @@ export default function Home() {
       {editingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
           <div 
-            onPaste={async (e) => {
-              const items = e.clipboardData.items;
-              for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image') !== -1) {
-                  const file = items[i].getAsFile();
-                  if (file) {
-                    e.preventDefault();
-                    await uploadImageToGarment(file);
-                  }
-                }
-              }
-            }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={async (e) => {
               e.preventDefault();
