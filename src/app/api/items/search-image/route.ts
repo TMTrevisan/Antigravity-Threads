@@ -19,9 +19,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Please provide at least a brand or a description.' }, { status: 400 });
     }
 
-    const queryText = `Find direct, high-quality product images (JPG/PNG) for the garment: Brand: ${brand || 'Unknown'}, Details: ${description || ''}. Search official manufacturer sites, Nordstrom, REI, Farfetch, SSENSE, Mr Porter, or similar retailers. Return clean flat-lay or model product shots.`;
+    const cleanSearchQuery = `${brand || ''} ${description || ''}`.trim();
+    const queryText = `Find direct, high-quality product images (JPG/PNG) for: "${cleanSearchQuery}". Search official manufacturer sites or major fashion retailers (Nordstrom, REI, SSENSE, Farfetch, Mr Porter, etc.). Return clean flat-lay or model product shots with direct image URLs.`;
 
-    console.log(`Starting Google Search Grounding for: Brand: ${brand}, Desc: ${description}`);
+    console.log(`Starting Google Search Grounding for clean query: ${cleanSearchQuery}`);
     const response = await ai.models.generateContent({
       model: 'gemini-flash-latest',
       contents: queryText,

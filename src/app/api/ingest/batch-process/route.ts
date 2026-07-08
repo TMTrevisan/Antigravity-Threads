@@ -75,7 +75,7 @@ export async function POST(request: Request) {
           - Color Family: The dominant color name.
           - Hex Code: Nearest hex code swatch representing the color, e.g. #002060.
           - Tonal Value: Must be exactly one of: 'Light', 'Medium', 'Dark'.
-          - Fabric Type: e.g. Cotton, Linen, Denim, Wool, Silk.
+          - Fabric Type: e.g. Cotton, Linen, Denim, Wool, Silk. Extract exact percentages/composition if visible on tags (e.g., 70% Wool, 30% Cashmere or 100% Linen).
           - Fit Block: e.g. Slim, Regular, Relaxed, Tailored.
           - Brand: The visible brand (or "Unknown").
           
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
                 color_family: { type: 'string' },
                 hex_code: { type: 'string', description: 'Hex code swatch e.g. #556b2f' },
                 tonal_value: { type: 'string', enum: ['Light', 'Medium', 'Dark'] },
-                fabric_type: { type: 'string' },
+                fabric_type: { type: 'string', description: 'The fabric type or blend composition, e.g. 70% Wool, 30% Cashmere' },
                 fit_block: { type: 'string' },
               },
               required: ['category', 'sub_category', 'color_family', 'hex_code', 'tonal_value', 'fabric_type', 'fit_block'],

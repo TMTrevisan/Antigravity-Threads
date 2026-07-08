@@ -126,6 +126,64 @@ export default function Home() {
   const [isReplacingImage, setIsReplacingImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatProvider, setChatProvider] = useState<'gemini' | 'openai' | 'anthropic'>('gemini');
+  const [chatApiKey, setChatApiKey] = useState('');
+  const [showChatSettings, setShowChatSettings] = useState(false);
+  const [isChatTyping, setIsChatTyping] = useState(false);
+
+  useEffect(() => {
+    const savedProvider = localStorage.getItem('threads_chat_provider') as any;
+    const savedKey = localStorage.getItem('threads_chat_key') || '';
+    if (savedProvider) setChatProvider(savedProvider);
+    if (savedKey) setChatApiKey(savedKey);
+  }, []);
+
+  const sendChatMessage = async (customText?: string) => {
+    const textToSend = customText || chatInput;
+    if (!textToSend.trim()) return;
+
+    const newMessages = [...chatMessages, { role: 'user' as const, content: textToSend }];
+    setChatMessages(newMessages);
+    setChatInput('');
+    setIsChatTyping(true);
+
+    try {
+      const wardrobeContext = items
+        .map(
+          (i) =>
+            `${i.id} | ${i.category} | ${i.sub_category} | ${i.color_family} | ${i.fabric_type} | ${i.fit_block} | Wears: ${
+              wearLogs.filter((log) => log.garment_id === i.id).length
+            }`
+        )
+        .join('\n');
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages,
+          provider: chatProvider,
+          apiKey: chatApiKey,
+          wardrobe: wardrobeContext
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
+      } else {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ Error: ${data.error || 'Failed to generate response.'}` }]);
+      }
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ Error: ${err.message}` }]);
+    } finally {
+      setIsChatTyping(false);
+    }
+  };
+
   const uploadImageToGarment = async (file: File) => {
     if (!editingItem) return;
     setIsUploadingImage(true);
@@ -4037,6 +4095,164 @@ export default function Home() {
             <span className="text-[10px]">Metrics</span>
           </button>
         </nav>
+      )}
+      {/* FLOATING CHAT BUBBLE */}
+      <button
+        onClick={() => setChatOpen(true)}
+        className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-40 w-12 h-12 rounded-full bg-teal-500 hover:bg-teal-400 text-black shadow-2xl flex items-center justify-center transition transform hover:scale-105 active:scale-95"
+        title="Threads AI Stylist"
+      >
+        <span className="text-xl">💬</span>
+      </button>
+
+      {/* CHAT DRAWER PANEL */}
+      {chatOpen && (
+        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#1f2833] border-l border-zinc-800 shadow-2xl flex flex-col animate-slide-left">
+          {/* HEADER */}
+          <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/40">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse"></span>
+              <h3 className="text-sm font-bold text-white">Threads AI Stylist</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setShowChatSettings(!showChatSettings)} 
+                className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-800 transition text-sm"
+                title="AI Settings"
+              >
+                ⚙️
+              </button>
+              <button 
+                onClick={() => setChatOpen(false)} 
+                className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-800 transition text-sm"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* SETTINGS PANEL OVERLAY */}
+          {showChatSettings ? (
+            <div className="p-4 border-b border-zinc-800 bg-[#0b0c10]/40 space-y-3">
+              <h4 className="text-[10px] uppercase font-bold text-teal-400">Stylist Model Configuration</h4>
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase font-bold text-zinc-400">AI Provider</label>
+                  <select 
+                    value={chatProvider}
+                    onChange={(e) => setChatProvider(e.target.value as any)}
+                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                  >
+                    <option value="gemini">Google Gemini (Recommended)</option>
+                    <option value="openai">OpenAI GPT-4o-Mini</option>
+                    <option value="anthropic">Anthropic Claude 3.5 Haiku</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase font-bold text-zinc-400">Custom API Key (Optional)</label>
+                  <input
+                    type="password"
+                    placeholder="Enter key to override env default..."
+                    value={chatApiKey}
+                    onChange={(e) => {
+                      setChatApiKey(e.target.value);
+                      localStorage.setItem('threads_chat_key', e.target.value);
+                    }}
+                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                  />
+                  <span className="text-[8px] text-zinc-500">Stored locally in your browser's secure cache.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('threads_chat_provider', chatProvider);
+                    setShowChatSettings(false);
+                  }}
+                  className="w-full py-1.5 bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 text-[10px] font-bold rounded-lg transition"
+                >
+                  Save Config
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {/* MESSAGES */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#0b0c10]/20">
+            {chatMessages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
+                <span className="text-3xl">🧥</span>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-zinc-300">How can I help style you today?</p>
+                  <p className="text-[10px] text-zinc-500">Ask about outfits, coordinate combinations, or identify closet clutter.</p>
+                </div>
+                <div className="w-full max-w-xs space-y-2 pt-2">
+                  <button
+                    onClick={() => sendChatMessage("Suggest a stylish outfit combination for warm weather")}
+                    className="w-full p-2 bg-[#0b0c10]/50 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-[10px] text-left text-zinc-300 transition"
+                  >
+                    ☀️ Suggest a warm weather outfit...
+                  </button>
+                  <button
+                    onClick={() => sendChatMessage("Which items in my closet have the least number of wear counts?")}
+                    className="w-full p-2 bg-[#0b0c10]/50 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-[10px] text-left text-zinc-300 transition"
+                  >
+                    📉 Find my least worn items...
+                  </button>
+                  <button
+                    onClick={() => sendChatMessage("Give me a styling recommendation using my green linen shirt")}
+                    className="w-full p-2 bg-[#0b0c10]/50 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-[10px] text-left text-zinc-300 transition"
+                  >
+                    🟢 Style my green linen shirt...
+                  </button>
+                </div>
+              </div>
+            ) : (
+              chatMessages.map((m, idx) => (
+                <div key={idx} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${
+                    m.role === 'user' 
+                      ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' 
+                      : 'bg-zinc-900 border border-zinc-800 text-zinc-200'
+                  }`}>
+                    {m.content}
+                  </div>
+                </div>
+              ))
+            )}
+            {isChatTyping && (
+              <div className="flex justify-start">
+                <div className="bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-2xl px-3.5 py-2 text-xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* INPUT FORM */}
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              sendChatMessage();
+            }} 
+            className="p-3 border-t border-zinc-800 bg-[#0b0c10]/40 flex gap-2"
+          >
+            <input
+              type="text"
+              placeholder="Ask Stylist..."
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              className="flex-1 bg-[#0b0c10] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-400"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-teal-500 text-black font-bold text-xs rounded-xl hover:bg-teal-400 transition"
+            >
+              Send
+            </button>
+          </form>
+        </div>
       )}
     </div>
   );
