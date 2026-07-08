@@ -24,6 +24,7 @@ interface Garment {
   primary_image_url: string | null;
   notes: string | null;
   price: number;
+  purchase_year: number | null;
   created_at: string;
 }
 
@@ -72,8 +73,9 @@ interface IngestGroup {
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'snap' | 'closet' | 'stylist' | 'metrics'>('snap');
+  const [activeTab, setActiveTab] = useState<'snap' | 'closet' | 'spreadsheet' | 'stylist' | 'metrics'>('snap');
   const [closetSubTab, setClosetSubTab] = useState<'items' | 'outfits' | 'locker' | 'analytics' | 'guide'>('items');
+  const [editedItems, setEditedItems] = useState<Record<string, Partial<Garment>>>({});
 
   // Core Curation State
   const [items, setItems] = useState<Garment[]>([]);
@@ -125,6 +127,17 @@ export default function Home() {
   const [isSearchingImage, setIsSearchingImage] = useState(false);
   const [isReplacingImage, setIsReplacingImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [searchQueryText, setSearchQueryText] = useState('');
+
+  useEffect(() => {
+    if (editingItem) {
+      setSearchQueryText(`${editingItem.brand || ''} ${editingItem.sub_category || ''} ${editingItem.color_family || ''}`.trim());
+    } else if (validationTarget) {
+      setSearchQueryText(`${validationTarget.brand || ''} ${validationTarget.sub_category || ''} ${validationTarget.color_family || ''}`.trim());
+    } else {
+      setSearchQueryText('');
+    }
+  }, [editingItem, validationTarget]);
 
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
@@ -501,6 +514,80 @@ export default function Home() {
     } finally {
       setLoadingItems(false);
     }
+  };
+
+  const handleSpreadsheetFieldChange = (id: string, field: string, value: any) => {
+    setEditedItems(prev => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSaveSpreadsheetRow = async (id: string) => {
+    const changes = editedItems[id];
+    if (!changes) return;
+    try {
+      const res = await fetch('/api/items', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...changes })
+      });
+      if (res.ok) {
+        setEditedItems(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        await fetchItems();
+      } else {
+        alert('Failed to save changes.');
+      }
+    } catch (err: any) {
+      alert(`Save error: ${err.message}`);
+    }
+  };
+
+  const handleDeleteSpreadsheetRow = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this garment?')) return;
+    try {
+      const res = await fetch(`/api/items?id=${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        await fetchItems();
+      } else {
+        alert('Failed to delete item.');
+      }
+    } catch (err: any) {
+      alert(`Delete error: ${err.message}`);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['ID', 'Brand', 'Category', 'Sub-Category', 'Color Family', 'Fabric Blend', 'Fit Block', 'Purchase Price', 'Purchase Year'];
+    const rows = items.map(i => [
+      i.id,
+      i.brand || '',
+      i.category,
+      i.sub_category,
+      i.color_family,
+      i.fabric_type || '',
+      i.fit_block || '',
+      i.price || 0,
+      i.purchase_year || ''
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "threads_wardrobe_export.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const fetchWearLogs = async () => {
@@ -1224,6 +1311,16 @@ export default function Home() {
           </button>
 
           <button
+            onClick={() => setActiveTab('spreadsheet')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
+              activeTab === 'spreadsheet' ? 'bg-gradient-to-r from-teal-500/10 to-indigo-500/10 text-teal-400 border-l-2 border-teal-400' : 'hover:bg-zinc-800/40 text-zinc-400'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            Spreadsheet
+          </button>
+
+          <button
             onClick={() => setActiveTab('stylist')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
               activeTab === 'stylist' ? 'bg-gradient-to-r from-teal-500/10 to-indigo-500/10 text-teal-400 border-l-2 border-teal-400' : 'hover:bg-zinc-800/40 text-zinc-400'
@@ -1457,36 +1554,45 @@ export default function Home() {
                             className="object-contain w-full h-full mix-blend-lighten filter saturate-[1.1] contrast-[1.05]"
                           />
                         </div>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setIsSearchingImage(true);
-                            setSearchResults(null);
-                            try {
-                              const res = await fetch('/api/items/search-image', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  brand: validationTarget.brand,
-                                  description: `${validationTarget.sub_category} ${validationTarget.notes || ''}`
-                                }),
-                              });
-                              const data = await res.json();
-                              if (res.ok) {
-                                setSearchResults(data.images || []);
-                              } else {
-                                alert(`Search failed: ${data.error || 'Unknown error'}`);
+                        <div className="w-full flex gap-2">
+                          <input
+                            type="text"
+                            value={searchQueryText}
+                            onChange={(e) => setSearchQueryText(e.target.value)}
+                            placeholder="Search query (e.g. White Oxford Shirt)..."
+                            className="flex-1 bg-[#0b0c10] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setIsSearchingImage(true);
+                              setSearchResults(null);
+                              try {
+                                const res = await fetch('/api/items/search-image', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    brand: '',
+                                    description: searchQueryText
+                                  }),
+                                });
+                                const data = await res.json();
+                                if (res.ok) {
+                                  setSearchResults(data.images || []);
+                                } else {
+                                  alert(`Search failed: ${data.error || 'Unknown error'}`);
+                                }
+                              } catch (err: any) {
+                                alert(`Search error: ${err.message}`);
+                              } finally {
+                                setIsSearchingImage(false);
                               }
-                            } catch (err: any) {
-                              alert(`Search error: ${err.message}`);
-                            } finally {
-                              setIsSearchingImage(false);
-                            }
-                          }}
-                          className="w-full py-2 text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 font-bold rounded-xl transition flex items-center justify-center gap-1.5"
-                        >
-                          {isSearchingImage ? 'Searching...' : '🔍 Find Manufacturer Photo'}
-                        </button>
+                            }}
+                            className="px-4 py-2 text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 font-bold rounded-xl transition flex items-center justify-center gap-1.5 shrink-0"
+                          >
+                            {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
+                          </button>
+                        </div>
 
                         {/* SEARCH RESULTS PANEL IN VALIDATION */}
                         {searchResults && (
@@ -1623,6 +1729,17 @@ export default function Home() {
                               type="number"
                               value={validationTarget.price || 0}
                               onChange={(e) => setValidationTarget({ ...validationTarget, price: Number(e.target.value) })}
+                              className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Purchase Year</label>
+                            <input
+                              type="number"
+                              placeholder="e.g. 2026"
+                              value={validationTarget.purchase_year || ''}
+                              onChange={(e) => setValidationTarget({ ...validationTarget, purchase_year: e.target.value ? Number(e.target.value) : null })}
                               className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
                             />
                           </div>
@@ -1860,8 +1977,8 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Brand & Price input */}
-                        <div className="grid grid-cols-2 gap-4">
+                        {/* Brand, Price, & Year inputs */}
+                        <div className="grid grid-cols-3 gap-3">
                           <div className="space-y-1.5">
                             <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Brand</span>
                             <input
@@ -1869,17 +1986,27 @@ export default function Home() {
                               value={validationTarget.brand || ''}
                               onChange={(e) => setValidationTarget({ ...validationTarget, brand: e.target.value || null })}
                               className="w-full bg-zinc-900/60 border border-zinc-850 rounded-xl p-3.5 text-xs text-white placeholder-zinc-600 focus:border-teal-400 outline-none"
-                              placeholder="Brand name"
+                              placeholder="Brand"
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Est. Price ($)</span>
+                            <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Price ($)</span>
                             <input
                               type="number"
                               value={validationTarget.price || ''}
                               onChange={(e) => setValidationTarget({ ...validationTarget, price: Number(e.target.value) })}
                               className="w-full bg-zinc-900/60 border border-zinc-850 rounded-xl p-3.5 text-xs text-white placeholder-zinc-600 focus:border-teal-400 outline-none"
                               placeholder="Price"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Year</span>
+                            <input
+                              type="number"
+                              value={validationTarget.purchase_year || ''}
+                              onChange={(e) => setValidationTarget({ ...validationTarget, purchase_year: e.target.value ? Number(e.target.value) : null })}
+                              className="w-full bg-zinc-900/60 border border-zinc-850 rounded-xl p-3.5 text-xs text-white placeholder-zinc-600 focus:border-teal-400 outline-none"
+                              placeholder="Year"
                             />
                           </div>
                         </div>
@@ -1908,6 +2035,214 @@ export default function Home() {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* TAB: SPREADSHEET BULK EDITOR */}
+          {activeTab === 'spreadsheet' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                    📊 Wardrobe Spreadsheet Editor
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Edit garment metadata inline, paste image URLs to replace photos instantly, and perform bulk updates.
+                  </p>
+                </div>
+                <button
+                  onClick={handleExportCSV}
+                  className="px-4 py-2.5 bg-teal-500 text-black font-black text-xs rounded-xl hover:bg-teal-400 active:scale-95 transition-all shadow-lg flex items-center gap-1.5 self-start md:self-auto"
+                >
+                  📥 Export CSV
+                </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-[#1f2833]/10 shadow-2xl">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-zinc-950/40 border-b border-zinc-800 text-zinc-400 font-bold uppercase tracking-wider text-[10px] select-none">
+                      <th className="p-3.5 min-w-[140px]">Image / Swap</th>
+                      <th className="p-3.5 min-w-[120px]">Brand</th>
+                      <th className="p-3.5 min-w-[120px]">Category</th>
+                      <th className="p-3.5 min-w-[120px]">Sub-Category</th>
+                      <th className="p-3.5 min-w-[100px]">Color</th>
+                      <th className="p-3.5 min-w-[150px]">Fabric Blend</th>
+                      <th className="p-3.5 min-w-[100px]">Fit Block</th>
+                      <th className="p-3.5 min-w-[90px]">Price ($)</th>
+                      <th className="p-3.5 min-w-[90px]">Year</th>
+                      <th className="p-3.5 text-right min-w-[110px]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-850/60 bg-[#0b0c10]/20">
+                    {items.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="p-8 text-center text-zinc-500 font-semibold">
+                          No garments found in wardrobe.
+                        </td>
+                      </tr>
+                    ) : (
+                      items.map((item) => {
+                        const hasChanges = !!editedItems[item.id];
+                        const brandVal = editedItems[item.id]?.brand !== undefined ? (editedItems[item.id]?.brand || '') : (item.brand || '');
+                        const categoryVal = editedItems[item.id]?.category || item.category;
+                        const subCategoryVal = editedItems[item.id]?.sub_category !== undefined ? (editedItems[item.id]?.sub_category || '') : (item.sub_category || '');
+                        const colorVal = editedItems[item.id]?.color_family !== undefined ? (editedItems[item.id]?.color_family || '') : (item.color_family || '');
+                        const fabricVal = editedItems[item.id]?.fabric_type !== undefined ? (editedItems[item.id]?.fabric_type || '') : (item.fabric_type || '');
+                        const fitVal = editedItems[item.id]?.fit_block !== undefined ? (editedItems[item.id]?.fit_block || '') : (item.fit_block || '');
+                        const priceVal = editedItems[item.id]?.price !== undefined ? (editedItems[item.id]?.price || 0) : (item.price || 0);
+                        const yearVal = editedItems[item.id]?.purchase_year !== undefined ? (editedItems[item.id]?.purchase_year || '') : (item.purchase_year || '');
+                        
+                        return (
+                          <tr key={item.id} className="hover:bg-zinc-900/30 transition-colors">
+                            {/* Image Swap */}
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-9 h-9 rounded bg-black flex-shrink-0 overflow-hidden border border-zinc-800">
+                                  {item.primary_image_url ? (
+                                    <img src={item.primary_image_url} alt="" className="w-full h-full object-contain" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-zinc-600 text-[10px]">📷</div>
+                                  )}
+                                </div>
+                                <input
+                                  type="text"
+                                  placeholder="Paste image link..."
+                                  onChange={(e) => handleSpreadsheetFieldChange(item.id, 'primary_image_url', e.target.value)}
+                                  onBlur={async (e) => {
+                                    const val = e.target.value.trim();
+                                    if (val && (val.startsWith('http://') || val.startsWith('https://'))) {
+                                      try {
+                                        const res = await fetch('/api/items/search-image', {
+                                          method: 'PUT',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ garmentId: item.id, imageUrl: val })
+                                        });
+                                        if (res.ok) {
+                                          e.target.value = '';
+                                          await fetchItems();
+                                        } else {
+                                          alert('Failed to download image address.');
+                                        }
+                                      } catch (err: any) {
+                                        alert(`Failed to set image: ${err.message}`);
+                                      }
+                                    }
+                                  }}
+                                  className="w-24 text-[9px] bg-zinc-900/80 border border-zinc-800 rounded px-1.5 py-1 text-zinc-300 placeholder-zinc-650 focus:outline-none focus:border-teal-400"
+                                />
+                              </div>
+                            </td>
+                            {/* Brand */}
+                            <td className="p-3">
+                              <input
+                                type="text"
+                                value={brandVal}
+                                onChange={(e) => handleSpreadsheetFieldChange(item.id, 'brand', e.target.value || null)}
+                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                              />
+                            </td>
+                            {/* Category */}
+                            <td className="p-3">
+                              <select
+                                value={categoryVal}
+                                onChange={(e) => handleSpreadsheetFieldChange(item.id, 'category', e.target.value)}
+                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                              >
+                                <option value="Tops">Tops</option>
+                                <option value="Bottoms">Bottoms</option>
+                                <option value="Outerwear">Outerwear</option>
+                                <option value="Footwear">Footwear</option>
+                                <option value="Tailoring">Tailoring</option>
+                              </select>
+                            </td>
+                            {/* Sub-Category */}
+                            <td className="p-3">
+                              <input
+                                type="text"
+                                value={subCategoryVal}
+                                onChange={(e) => handleSpreadsheetFieldChange(item.id, 'sub_category', e.target.value)}
+                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                              />
+                            </td>
+                            {/* Color */}
+                            <td className="p-3">
+                              <input
+                                type="text"
+                                value={colorVal}
+                                onChange={(e) => handleSpreadsheetFieldChange(item.id, 'color_family', e.target.value)}
+                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                              />
+                            </td>
+                            {/* Fabric Blend */}
+                            <td className="p-3">
+                              <input
+                                type="text"
+                                value={fabricVal}
+                                onChange={(e) => handleSpreadsheetFieldChange(item.id, 'fabric_type', e.target.value || null)}
+                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                                placeholder="e.g. 100% Cotton"
+                              />
+                            </td>
+                            {/* Fit Block */}
+                            <td className="p-3">
+                              <input
+                                type="text"
+                                value={fitVal}
+                                onChange={(e) => handleSpreadsheetFieldChange(item.id, 'fit_block', e.target.value || null)}
+                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                              />
+                            </td>
+                            {/* Price */}
+                            <td className="p-3">
+                              <input
+                                type="number"
+                                value={priceVal}
+                                onChange={(e) => handleSpreadsheetFieldChange(item.id, 'price', Number(e.target.value))}
+                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                              />
+                            </td>
+                            {/* Year */}
+                            <td className="p-3">
+                              <input
+                                type="number"
+                                value={yearVal}
+                                onChange={(e) => handleSpreadsheetFieldChange(item.id, 'purchase_year', e.target.value ? Number(e.target.value) : null)}
+                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                                placeholder="YYYY"
+                              />
+                            </td>
+                            {/* Actions */}
+                            <td className="p-3 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  disabled={!hasChanges}
+                                  onClick={() => handleSaveSpreadsheetRow(item.id)}
+                                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition ${
+                                    hasChanges 
+                                      ? 'bg-teal-400 text-zinc-950 hover:bg-teal-300 active:scale-95' 
+                                      : 'bg-zinc-850 text-zinc-600 cursor-not-allowed'
+                                  }`}
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSpreadsheetRow(item.id)}
+                                  className="px-2 py-1.5 text-[10px] font-bold bg-zinc-900 text-rose-400 hover:bg-rose-500/10 rounded-lg border border-zinc-800 transition active:scale-95"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -3699,38 +4034,46 @@ export default function Home() {
                   <img src={editingItem.primary_image_url} alt="" className="object-contain w-full h-full" />
                 )}
               </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setIsSearchingImage(true);
-                    setSearchResults(null);
-                    try {
-                      const res = await fetch('/api/items/search-image', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          brand: editingItem.brand,
-                          description: `${editingItem.sub_category} ${editingItem.notes || ''}`
-                        }),
-                      });
-                      const data = await res.json();
-                      if (res.ok) {
-                        setSearchResults(data.images || []);
-                      } else {
-                        alert(`Search failed: ${data.error || 'Unknown error'}`);
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={searchQueryText}
+                    onChange={(e) => setSearchQueryText(e.target.value)}
+                    placeholder="Search query (e.g. White Oxford Shirt)..."
+                    className="flex-1 bg-[#0b0c10] border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsSearchingImage(true);
+                      setSearchResults(null);
+                      try {
+                        const res = await fetch('/api/items/search-image', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            brand: '',
+                            description: searchQueryText
+                          }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setSearchResults(data.images || []);
+                        } else {
+                          alert(`Search failed: ${data.error || 'Unknown error'}`);
+                        }
+                      } catch (err: any) {
+                        alert(`Search error: ${err.message}`);
+                      } finally {
+                        setIsSearchingImage(false);
                       }
-                    } catch (err: any) {
-                      alert(`Search error: ${err.message}`);
-                    } finally {
-                      setIsSearchingImage(false);
-                    }
-                  }}
-                  className="flex-1 py-2 text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 font-bold rounded-xl transition flex items-center justify-center gap-1.5"
-                >
-                  {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
-                </button>
-                
+                    }}
+                    className="px-4 py-1.5 bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shrink-0"
+                  >
+                    {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
+                  </button>
+                </div>
                 <input
                   type="file"
                   accept="image/*"
@@ -3745,7 +4088,7 @@ export default function Home() {
                 />
                 <label
                   htmlFor="manual-photo-upload"
-                  className="flex-1 py-2 text-xs bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-2 text-xs bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer text-center"
                 >
                   📁 Upload Photo
                 </label>
@@ -3916,6 +4259,17 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-zinc-400">Purchase Year</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 2026"
+                    value={editingItem.purchase_year || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, purchase_year: e.target.value ? Number(e.target.value) : null })}
+                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
                   <label className="text-[10px] uppercase font-bold text-zinc-400">Fabric</label>
                   <input
                     type="text"
@@ -4073,6 +4427,16 @@ export default function Home() {
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             <span className="text-[10px]">Closet</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('spreadsheet')}
+            className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
+              activeTab === 'spreadsheet' ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            <span className="text-[10px]">Grid</span>
           </button>
 
           <button
