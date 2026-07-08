@@ -142,7 +142,7 @@ export default function Home() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
-  const [chatProvider, setChatProvider] = useState<'gemini' | 'openai' | 'anthropic'>('gemini');
+  const [chatProvider, setChatProvider] = useState<'gemini' | 'openai' | 'anthropic' | 'deepseek' | 'minimax'>('gemini');
   const [chatApiKey, setChatApiKey] = useState('');
   const [showChatSettings, setShowChatSettings] = useState(false);
   const [isChatTyping, setIsChatTyping] = useState(false);
@@ -2062,16 +2062,16 @@ export default function Home() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-zinc-950/40 border-b border-zinc-800 text-zinc-400 font-bold uppercase tracking-wider text-[10px] select-none">
-                      <th className="p-3.5 min-w-[140px]">Image / Swap</th>
-                      <th className="p-3.5 min-w-[120px]">Brand</th>
-                      <th className="p-3.5 min-w-[120px]">Category</th>
-                      <th className="p-3.5 min-w-[120px]">Sub-Category</th>
-                      <th className="p-3.5 min-w-[100px]">Color</th>
-                      <th className="p-3.5 min-w-[150px]">Fabric Blend</th>
-                      <th className="p-3.5 min-w-[100px]">Fit Block</th>
-                      <th className="p-3.5 min-w-[90px]">Price ($)</th>
-                      <th className="p-3.5 min-w-[90px]">Year</th>
-                      <th className="p-3.5 text-right min-w-[110px]">Actions</th>
+                      <th className="p-2.5 w-[100px]">Image</th>
+                      <th className="p-2.5 min-w-[90px]">Brand</th>
+                      <th className="p-2.5 w-[88px]">Category</th>
+                      <th className="p-2.5 min-w-[90px]">Sub-Cat</th>
+                      <th className="p-2.5 min-w-[70px]">Color</th>
+                      <th className="p-2.5 min-w-[100px]">Fabric</th>
+                      <th className="p-2.5 min-w-[80px]">Fit</th>
+                      <th className="p-2.5 w-[64px]">$ Price</th>
+                      <th className="p-2.5 w-[60px]">Year</th>
+                      <th className="p-2.5 text-right w-[90px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-850/60 bg-[#0b0c10]/20">
@@ -2096,45 +2096,48 @@ export default function Home() {
                         return (
                           <tr key={item.id} className="hover:bg-zinc-900/30 transition-colors">
                             {/* Image Swap */}
-                            <td className="p-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-9 h-9 rounded bg-black flex-shrink-0 overflow-hidden border border-zinc-800">
-                                  {item.primary_image_url ? (
-                                    <img src={item.primary_image_url} alt="" className="w-full h-full object-contain" />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-zinc-600 text-[10px]">📷</div>
-                                  )}
-                                </div>
-                                <input
-                                  type="text"
-                                  placeholder="Paste image link..."
-                                  onChange={(e) => handleSpreadsheetFieldChange(item.id, 'primary_image_url', e.target.value)}
-                                  onBlur={async (e) => {
-                                    const val = e.target.value.trim();
-                                    if (val && (val.startsWith('http://') || val.startsWith('https://'))) {
-                                      try {
-                                        const res = await fetch('/api/items/search-image', {
-                                          method: 'PUT',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ garmentId: item.id, imageUrl: val })
-                                        });
-                                        if (res.ok) {
-                                          e.target.value = '';
-                                          await fetchItems();
-                                        } else {
-                                          alert('Failed to download image address.');
-                                        }
-                                      } catch (err: any) {
-                                        alert(`Failed to set image: ${err.message}`);
-                                      }
-                                    }
-                                  }}
-                                  className="w-24 text-[9px] bg-zinc-900/80 border border-zinc-800 rounded px-1.5 py-1 text-zinc-300 placeholder-zinc-650 focus:outline-none focus:border-teal-400"
-                                />
-                              </div>
-                            </td>
+                            <td className="p-2">
+                               <div className="flex flex-col items-center gap-1">
+                                 <div
+                                   className="w-10 h-10 rounded bg-black overflow-hidden border border-zinc-800 cursor-pointer hover:border-teal-400 transition"
+                                   onClick={() => setEditingItem(item)}
+                                   title="Click to open editor"
+                                 >
+                                   {item.primary_image_url ? (
+                                     <img src={item.primary_image_url} alt="" className="w-full h-full object-contain" />
+                                   ) : (
+                                     <div className="w-full h-full flex items-center justify-center text-zinc-600 text-[10px]">📷</div>
+                                   )}
+                                 </div>
+                                 <input
+                                   type="text"
+                                   placeholder="Paste URL..."
+                                   onBlur={async (e) => {
+                                     const val = e.target.value.trim();
+                                     if (val && (val.startsWith('http://') || val.startsWith('https://'))) {
+                                       try {
+                                         const res = await fetch('/api/items/search-image', {
+                                           method: 'PUT',
+                                           headers: { 'Content-Type': 'application/json' },
+                                           body: JSON.stringify({ garmentId: item.id, imageUrl: val })
+                                         });
+                                         if (res.ok) {
+                                           e.target.value = '';
+                                           await fetchItems();
+                                         } else {
+                                           alert('Failed to replace image.');
+                                         }
+                                       } catch (err: any) {
+                                         alert(`Error: ${err.message}`);
+                                       }
+                                     }
+                                   }}
+                                   className="w-full text-[8px] bg-zinc-900/80 border border-zinc-800 rounded px-1 py-0.5 text-zinc-300 placeholder-zinc-650 focus:outline-none focus:border-teal-400"
+                                 />
+                               </div>
+                             </td>
                             {/* Brand */}
-                            <td className="p-3">
+                            <td className="p-2">
                               <input
                                 type="text"
                                 value={brandVal}
@@ -4300,18 +4303,59 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="space-y-1 border-t border-zinc-800 pt-2.5">
-                <span className="text-[10px] uppercase font-bold text-zinc-400">Curation Actions</span>
-                <div className="flex gap-2 items-center justify-between text-xs text-zinc-400 mt-1">
-                  <span>Wears logged: <strong className="text-white">{getItemWornCount(editingItem.id)}x</strong></span>
-                  <button
-                    type="button"
-                    onClick={() => logGarmentWorn(editingItem.id)}
-                    className="px-3 py-1 rounded bg-teal-400 text-black font-bold text-xs"
-                  >
-                    + Log Wear Today
-                  </button>
+              {/* Notes Field */}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-zinc-400">📝 Notes</label>
+                <textarea
+                  value={editingItem.notes || ''}
+                  onChange={(e) => setEditingItem({ ...editingItem, notes: e.target.value || null })}
+                  placeholder="Add personal notes, care instructions, styling ideas..."
+                  rows={3}
+                  className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white resize-none focus:outline-none focus:border-teal-400/50"
+                />
+              </div>
+
+              {/* Created / Updated dates */}
+              <div className="flex gap-3 text-[10px] text-zinc-600">
+                <span>Added: <span className="text-zinc-500">{editingItem.created_at ? new Date(editingItem.created_at).toLocaleDateString() : '—'}</span></span>
+              </div>
+
+              {/* Curation Actions + Wear History */}
+              <div className="space-y-2 border-t border-zinc-800 pt-2.5">
+                <div className="flex gap-2 items-center justify-between text-xs text-zinc-400">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400">Wear History</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-300 font-bold">{getItemWornCount(editingItem.id)}x total</span>
+                    <button
+                      type="button"
+                      onClick={() => logGarmentWorn(editingItem.id)}
+                      className="px-3 py-1 rounded bg-teal-400 text-black font-bold text-xs"
+                    >
+                      + Log Wear
+                    </button>
+                  </div>
                 </div>
+                {/* Collapsible scrollable history */}
+                {wearLogs.filter(l => l.garment_id === editingItem.id).length > 0 && (
+                  <details className="group">
+                    <summary className="text-[10px] text-zinc-500 cursor-pointer hover:text-zinc-300 transition select-none list-none flex items-center gap-1">
+                      <span className="group-open:hidden">▶</span>
+                      <span className="hidden group-open:inline">▼</span>
+                      {wearLogs.filter(l => l.garment_id === editingItem.id).length} wear entries
+                    </summary>
+                    <div className="mt-1.5 max-h-32 overflow-y-auto space-y-0.5 bg-zinc-950/50 rounded-lg p-2">
+                      {wearLogs
+                        .filter(l => l.garment_id === editingItem.id)
+                        .sort((a, b) => new Date(b.worn_at).getTime() - new Date(a.worn_at).getTime())
+                        .map((log, idx) => (
+                          <div key={log.id} className="flex items-center justify-between text-[10px] text-zinc-400 py-0.5 border-b border-zinc-800/60 last:border-0">
+                            <span>#{wearLogs.filter(l => l.garment_id === editingItem.id).length - idx}</span>
+                            <span>{new Date(log.worn_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </details>
+                )}
               </div>
 
               {/* STYLE PAIRINGS COORDINATION */}
@@ -4510,6 +4554,8 @@ export default function Home() {
                     <option value="gemini">Google Gemini (Recommended)</option>
                     <option value="openai">OpenAI GPT-4o-Mini</option>
                     <option value="anthropic">Anthropic Claude 3.5 Haiku</option>
+                    <option value="deepseek">DeepSeek Chat</option>
+                    <option value="minimax">MiniMax Text-01</option>
                   </select>
                 </div>
                 <div className="space-y-1">

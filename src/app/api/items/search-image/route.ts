@@ -1,18 +1,21 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { supabase } from '@/lib/supabase';
 import { logTelemetry } from '@/lib/telemetry';
 
+// Google Custom Search API – returns real, directly-accessible image URLs.
+// Keys: GOOGLE_CSE_KEY (API key) + GOOGLE_CSE_CX (Programmable Search Engine ID, image-only).
+// Free tier: 100 queries/day. Set up at https://programmablesearchengine.google.com/
+const GOOGLE_CSE_KEY = process.env.GOOGLE_CSE_KEY || '';
+const GOOGLE_CSE_CX = process.env.GOOGLE_CSE_CX || '';
+
+// Fallback: Gemini grounding (returns landing page URLs, not direct images, but better than nothing)
+import { GoogleGenAI } from '@google/genai';
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
 const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
-// POST: Search the web using Gemini grounding for clean manufacturer images
+// POST: Search the web for clean manufacturer images
 export async function POST(request: Request) {
   try {
-    if (!ai) {
-      return NextResponse.json({ error: 'GEMINI_API_KEY is not configured.' }, { status: 500 });
-    }
-
     const { brand, description } = await request.json();
 
     if (!brand && !description) {
@@ -20,9 +23,62 @@ export async function POST(request: Request) {
     }
 
     const cleanSearchQuery = `${brand || ''} ${description || ''}`.trim();
-    const queryText = `Find direct, high-quality product images (JPG/PNG) for: "${cleanSearchQuery}". Search official manufacturer sites or major fashion retailers (Nordstrom, REI, SSENSE, Farfetch, Mr Porter, etc.). Return clean flat-lay or model product shots with direct image URLs.`;
+    console.log(`Image search for: "${cleanSearchQuery}"`);
 
-    console.log(`Starting Google Search Grounding for clean query: ${cleanSearchQuery}`);
+    // ── PATH A: Google Custom Search API (preferred – real image URLs) ──────────
+    if (GOOGLE_CSE_KEY && GOOGLE_CSE_CX) {
+      try {
+        // Two rounds: first try exact query, then broaden with "product photo"
+        const queries = [
+          `${cleanSearchQuery} product photo`,
+          `${cleanSearchQuery} official`
+        ];
+
+        const allImages: { url: string; source: string; title: string }[] = [];
+
+        for (const q of queries) {
+          if (allImages.length >= 8) break;
+          const url = new URL('https://www.googleapis.com/customsearch/v1');
+          url.searchParams.set('key', GOOGLE_CSE_KEY);
+          url.searchParams.set('cx', GOOGLE_CSE_CX);
+          url.searchParams.set('searchType', 'image');
+          url.searchParams.set('q', q);
+          url.searchParams.set('num', '5');
+          url.searchParams.set('imgType', 'photo');
+          url.searchParams.set('safe', 'active');
+
+          const res = await fetch(url.toString());
+          if (!res.ok) {
+            const errText = await res.text();
+            console.warn('Google CSE error:', res.status, errText);
+            break;
+          }
+          const data = await res.json();
+          for (const item of (data.items || [])) {
+            if (!allImages.find(i => i.url === item.link)) {
+              allImages.push({
+                url: item.link,
+                source: item.displayLink || 'Google Images',
+                title: item.title || cleanSearchQuery
+              });
+            }
+          }
+        }
+
+        await logTelemetry('Gemini_Search_Image', 0, 0, { brand, query: cleanSearchQuery, engine: 'google_cse', results: allImages.length });
+        return NextResponse.json({ images: allImages.slice(0, 8) });
+      } catch (cseErr: any) {
+        console.error('Google CSE search failed, falling back to Gemini grounding:', cseErr.message);
+      }
+    }
+
+    // ── PATH B: Gemini Grounding fallback (returns page thumbnails, not always direct) ──
+    if (!ai) {
+      return NextResponse.json({ error: 'No search engine configured. Add GOOGLE_CSE_KEY + GOOGLE_CSE_CX or GEMINI_API_KEY to your environment.' }, { status: 500 });
+    }
+
+    const queryText = `Find 6 direct, high-quality product image URLs (ending in .jpg, .jpeg, .png, or .webp) for the exact garment: "${cleanSearchQuery}". Search only official brand sites, Nordstrom, SSENSE, Farfetch, Mr Porter, or similar premium fashion retailers. Return ONLY direct image file URLs — no redirect links, no HTML page links.`;
+
     const response = await ai.models.generateContent({
       model: 'gemini-flash-latest',
       contents: queryText,
@@ -34,13 +90,13 @@ export async function POST(request: Request) {
           properties: {
             images: {
               type: 'ARRAY',
-              description: 'Direct high-resolution image URLs of the matching garment from manufacturer or retailer pages.',
+              description: 'Direct product image URLs from brand or retailer CDNs.',
               items: {
                 type: 'OBJECT',
                 properties: {
-                  url: { type: 'STRING', description: 'Direct image URL' },
-                  source: { type: 'STRING', description: 'Source website name (e.g. Patagonia, SSENSE)' },
-                  title: { type: 'STRING', description: 'Title or label of the image' }
+                  url: { type: 'STRING', description: 'Direct image URL ending in .jpg/.png/.webp' },
+                  source: { type: 'STRING', description: 'Retailer or brand name (e.g., Nordstrom)' },
+                  title: { type: 'STRING', description: 'Product title' }
                 },
                 required: ['url', 'source']
               }
@@ -52,16 +108,13 @@ export async function POST(request: Request) {
     });
 
     const text = response.text;
-    if (!text) {
-      return NextResponse.json({ images: [] });
-    }
+    if (!text) return NextResponse.json({ images: [] });
 
     const parsed = JSON.parse(text);
-    
-    // Log Telemetry
+
     const promptTokens = response.usageMetadata?.promptTokenCount || 0;
     const candidatesTokens = response.usageMetadata?.candidatesTokenCount || 0;
-    await logTelemetry('Gemini_Search_Image', promptTokens, candidatesTokens, { brand, query: queryText });
+    await logTelemetry('Gemini_Search_Image', promptTokens, candidatesTokens, { brand, query: cleanSearchQuery, engine: 'gemini_grounding' });
 
     return NextResponse.json({ images: parsed.images || [] });
   } catch (error: any) {
@@ -70,7 +123,7 @@ export async function POST(request: Request) {
   }
 }
 
-// PUT: Download the chosen manufacturer image and replace the garment's profile image
+// PUT: Download the chosen manufacturer image and replace the garment's primary profile image
 export async function PUT(request: Request) {
   try {
     const { garmentId, imageUrl } = await request.json();
@@ -79,25 +132,31 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Missing garmentId or imageUrl.' }, { status: 400 });
     }
 
-    console.log(`Downloading manufacturer image for replacement: ${imageUrl}`);
-    
-    // Fetch the image with custom User-Agent headers to avoid bot detection block
+    console.log(`Downloading replacement image for garment ${garmentId}: ${imageUrl}`);
+
+    // Fetch image with browser-like headers to avoid 403 blocks from CDNs
     const imageResponse = await fetch(imageUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-        'Accept': 'image/jpeg,image/png,image/webp,image/*;q=0.8'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.google.com/'
       }
     });
 
     if (!imageResponse.ok) {
-      return NextResponse.json({ error: `Failed to download image from source: Status ${imageResponse.status}` }, { status: 400 });
+      return NextResponse.json({ error: `Failed to download image: HTTP ${imageResponse.status}` }, { status: 400 });
     }
 
     const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    if (!contentType.startsWith('image/')) {
+      return NextResponse.json({ error: `URL does not point to an image (got ${contentType})` }, { status: 400 });
+    }
+
     const blob = await imageResponse.blob();
     const buffer = Buffer.from(await blob.arrayBuffer());
 
-    // 1. Fetch primary image record for this garment
+    // Find the primary image record for this garment
     const { data: primaryImage, error: fetchError } = await supabase
       .from('garment_images')
       .select('id')
@@ -106,44 +165,59 @@ export async function PUT(request: Request) {
       .single();
 
     if (fetchError || !primaryImage) {
-      return NextResponse.json({ error: 'Primary garment image record not found.' }, { status: 404 });
+      // If no primary image exists yet, insert a new one
+      const ext = contentType.split('/').pop()?.split(';')[0] || 'jpg';
+      const fileName = `raw/${garmentId}-replaced-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('wardrobe-images')
+        .upload(fileName, buffer, { contentType, upsert: true });
+
+      if (uploadError) {
+        return NextResponse.json({ error: `Storage upload failed: ${uploadError.message}` }, { status: 500 });
+      }
+
+      const { data: { publicUrl } } = supabase.storage.from('wardrobe-images').getPublicUrl(fileName);
+
+      const { error: insertError } = await supabase.from('garment_images').insert({
+        garment_id: garmentId,
+        storage_path: publicUrl,
+        is_primary_profile: true,
+        asset_type: 'profile'
+      });
+
+      if (insertError) {
+        return NextResponse.json({ error: `DB insert failed: ${insertError.message}` }, { status: 500 });
+      }
+
+      await supabase.from('garments').update({ status: 'Active', updated_at: new Date().toISOString() }).eq('id', garmentId);
+      return NextResponse.json({ success: true, url: publicUrl });
     }
 
-    const fileExtension = contentType.split('/').pop() || 'jpg';
-    const fileName = `raw/${garmentId}-replaced-${Date.now()}.${fileExtension}`;
+    // Upload new file and update the existing primary image row
+    const ext = contentType.split('/').pop()?.split(';')[0] || 'jpg';
+    const fileName = `raw/${garmentId}-replaced-${Date.now()}.${ext}`;
 
-    // 2. Upload to Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from('wardrobe-images')
-      .upload(fileName, buffer, {
-        contentType,
-        upsert: true,
-      });
+      .upload(fileName, buffer, { contentType, upsert: true });
 
     if (uploadError) {
       return NextResponse.json({ error: `Storage upload failed: ${uploadError.message}` }, { status: 500 });
     }
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('wardrobe-images')
-      .getPublicUrl(fileName);
+    const { data: { publicUrl } } = supabase.storage.from('wardrobe-images').getPublicUrl(fileName);
 
-    // 3. Update the garment image table row
     const { error: updateError } = await supabase
       .from('garment_images')
       .update({ storage_path: publicUrl })
       .eq('id', primaryImage.id);
 
     if (updateError) {
-      return NextResponse.json({ error: `Database update failed: ${updateError.message}` }, { status: 500 });
+      return NextResponse.json({ error: `DB update failed: ${updateError.message}` }, { status: 500 });
     }
 
-    // 4. Update the garment status to processing so it can be cutout again if needed
-    await supabase
-      .from('garments')
-      .update({ status: 'Active' })
-      .eq('id', garmentId);
-
+    await supabase.from('garments').update({ status: 'Active', updated_at: new Date().toISOString() }).eq('id', garmentId);
     return NextResponse.json({ success: true, url: publicUrl });
   } catch (error: any) {
     console.error('Image replacement PUT route error:', error);

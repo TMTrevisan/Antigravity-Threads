@@ -129,6 +129,63 @@ Rules & Instructions:
       const text = data.content?.[0]?.text || '';
       return NextResponse.json({ text });
 
+    } else if (activeProvider === 'deepseek') {
+      const key = apiKey || process.env.DEEPSEEK_API_KEY || '';
+      if (!key) {
+        return NextResponse.json({ error: 'DeepSeek API key is not configured.' }, { status: 400 });
+      }
+
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: formattedMessages,
+          max_tokens: 1024
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return NextResponse.json({ error: `DeepSeek API error: ${errorData.error?.message || response.statusText}` }, { status: response.status });
+      }
+
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content || '';
+      return NextResponse.json({ text });
+
+    } else if (activeProvider === 'minimax') {
+      const key = apiKey || process.env.MINIMAX_API_KEY || '';
+      if (!key) {
+        return NextResponse.json({ error: 'MiniMax API key is not configured.' }, { status: 400 });
+      }
+
+      // MiniMax uses the same OpenAI-compatible interface
+      const response = await fetch('https://api.minimaxi.chat/v1/text/chatcompletion_v2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: 'MiniMax-Text-01',
+          messages: formattedMessages,
+          max_tokens: 1024
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return NextResponse.json({ error: `MiniMax API error: ${errorData.base_resp?.status_msg || response.statusText}` }, { status: response.status });
+      }
+
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content || '';
+      return NextResponse.json({ text });
+
     } else {
       return NextResponse.json({ error: `Unsupported provider: ${activeProvider}` }, { status: 400 });
     }

@@ -33,16 +33,16 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, images, primary_image_url, ...updates } = body;
+    const { id, images, primary_image_url, garment_images, ...updates } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Item ID is required.' }, { status: 400 });
     }
 
-    // 1. Update core garment data
+    // 1. Update core garment data (with updated_at timestamp)
     const { data: updatedItem, error } = await supabase
       .from('garments')
-      .update(updates)
+      .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single();
