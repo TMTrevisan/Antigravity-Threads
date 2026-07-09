@@ -233,16 +233,16 @@ export async function PUT(request: Request) {
     const blob = await imageResponse.blob();
     const buffer = Buffer.from(await blob.arrayBuffer());
 
-    // Find the primary image record for this garment
-    const { data: primaryImage, error: fetchError } = await supabase
+    // Check if there are any existing images for this garment
+    const { data: existingImages, error: fetchError } = await supabase
       .from('garment_images')
       .select('id')
-      .eq('garment_id', garmentId)
-      .eq('is_primary_profile', true)
-      .single();
+      .eq('garment_id', garmentId);
+
+    const isFirst = !existingImages || existingImages.length === 0;
 
     const ext = contentType.split('/').pop()?.split(';')[0] || 'jpg';
-    const fileName = `raw/${garmentId}-replaced-${Date.now()}.${ext}`;
+    const fileName = `raw/${garmentId}-added-${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from('wardrobe-images')
@@ -254,31 +254,30 @@ export async function PUT(request: Request) {
 
     const { data: { publicUrl } } = supabase.storage.from('wardrobe-images').getPublicUrl(fileName);
 
-    if (fetchError || !primaryImage) {
-      // No existing primary – insert new row
-      const { error: insertError } = await supabase.from('garment_images').insert({
+    // Insert as a new image. If it's the first image, mark it primary. Otherwise, false.
+    const { data: newImage, error: insertError } = await supabase
+      .from('garment_images')
+      .insert({
         garment_id: garmentId,
         storage_path: publicUrl,
-        is_primary_profile: true,
-        asset_type: 'profile'
-      });
-      if (insertError) {
-        return NextResponse.json({ error: `DB insert failed: ${insertError.message}` }, { status: 500 });
-      }
-    } else {
-      // Update existing primary image row
-      const { error: updateError } = await supabase
-        .from('garment_images')
-        .update({ storage_path: publicUrl })
-        .eq('id', primaryImage.id);
+        is_primary_profile: isFirst,
+        asset_type: isFirst ? 'profile' : 'detail'
+      })
+      .select()
+      .single();
 
-      if (updateError) {
-        return NextResponse.json({ error: `DB update failed: ${updateError.message}` }, { status: 500 });
-      }
+    if (insertError) {
+      return NextResponse.json({ error: `DB insert failed: ${insertError.message}` }, { status: 500 });
     }
 
+    // Fetch the updated images list to return to the UI
+    const { data: allImages } = await supabase
+      .from('garment_images')
+      .select('*')
+      .eq('garment_id', garmentId);
+
     await supabase.from('garments').update({ status: 'Active', updated_at: new Date().toISOString() }).eq('id', garmentId);
-    return NextResponse.json({ success: true, url: publicUrl });
+    return NextResponse.json({ success: true, url: publicUrl, images: allImages || [] });
   } catch (error: any) {
     console.error('[image-replace] Error:', error);
     return NextResponse.json({ error: error.message || 'An error occurred during replacement' }, { status: 500 });

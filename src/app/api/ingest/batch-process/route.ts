@@ -72,6 +72,12 @@ export async function POST(request: Request) {
           Classify the item under these rules:
           - Category: Must be exactly one of: 'Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Tailoring'.
           - Sub-Category: e.g. T-Shirt, Chinos, Chelsea Boots, Bomber Jacket, Blazer.
+          - Style Detail: The single most specific style descriptor for this garment. Examples:
+              Tops → 'Long Sleeve', 'Short Sleeve', 'Sleeveless', '3/4 Sleeve', 'Polo', 'Henley', 'Crew Neck', 'V-Neck', 'Button-Down Collar'
+              Bottoms → 'Straight Leg', 'Slim Leg', 'Wide Leg', 'Tapered', 'Cropped', 'Cargo', 'Pleated'
+              Outerwear → 'Single Breasted', 'Double Breasted', 'Hooded', 'Quilted', 'Zip-Up'
+              Footwear → 'Oxford', 'Derby', 'Chelsea Boot', 'Chukka', 'Loafer', 'Sneaker', 'Slip-On'
+              Tailoring → 'Single Breasted', 'Double Breasted', 'Peak Lapel', 'Notch Lapel'
           - Color Family: The dominant color name.
           - Hex Code: Nearest hex code swatch representing the color, e.g. #002060.
           - Tonal Value: Must be exactly one of: 'Light', 'Medium', 'Dark'.
@@ -99,6 +105,10 @@ export async function POST(request: Request) {
                   enum: ['Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Tailoring'] 
                 },
                 sub_category: { type: 'string' },
+                style_detail: { 
+                  type: 'string', 
+                  description: 'Most specific style descriptor: e.g. Long Sleeve, Short Sleeve, Chelsea Boot, Oxford, Wide Leg, Single Breasted' 
+                },
                 brand: { type: 'string' },
                 color_family: { type: 'string' },
                 hex_code: { type: 'string', description: 'Hex code swatch e.g. #556b2f' },
@@ -106,7 +116,7 @@ export async function POST(request: Request) {
                 fabric_type: { type: 'string', description: 'The fabric type or blend composition, e.g. 70% Wool, 30% Cashmere' },
                 fit_block: { type: 'string' },
               },
-              required: ['category', 'sub_category', 'color_family', 'hex_code', 'tonal_value', 'fabric_type', 'fit_block'],
+              required: ['category', 'sub_category', 'style_detail', 'color_family', 'hex_code', 'tonal_value', 'fabric_type', 'fit_block'],
             },
           },
         });
@@ -341,6 +351,7 @@ export async function POST(request: Request) {
           .update({
             category: parsed.category,
             sub_category: parsed.sub_category,
+            style_detail: parsed.style_detail || null,
             brand: parsed.brand === 'Unknown' ? null : parsed.brand,
             color_family: parsed.color_family,
             hex_code: parsed.hex_code,

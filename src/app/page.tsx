@@ -369,16 +369,36 @@ export default function Home() {
     setCutoutProgress('Initializing AI engine...');
     try {
       setCutoutProgress('Loading AI cutout model (this may take a moment on first run)...');
-      const { pipeline, RawImage } = await import('@huggingface/transformers');
-      
-      const segmentator = await pipeline('image-segmentation', 'Xenova/RMBG-1.4');
-      
+      let segmentator;
+      try {
+        const { pipeline, env } = await import('@huggingface/transformers');
+        // Prevent transformer.js from making unauthorized local filesystem calls
+        env.allowLocalModels = false;
+        
+        segmentator = await pipeline('image-segmentation', 'Xenova/RMBG-1.4');
+      } catch (loadErr: any) {
+        console.warn('Browser-side model load failed, falling back to server-side execution:', loadErr);
+        setCutoutProgress('Running background removal on the server...');
+        const res = await fetch('/api/upload/cutout-server', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ garmentId, storagePath }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Server-side background removal failed.');
+        
+        await fetchItems();
+        alert('✨ Background removed successfully (processed on server)!');
+        return;
+      }
+
       setCutoutProgress('Fetching original garment image...');
       const response = await fetch(storagePath);
       if (!response.ok) throw new Error('Failed to retrieve original image from storage.');
       const imageBlob = await response.blob();
       
       setCutoutProgress('Processing cutout (segmenting background)...');
+      const { RawImage } = await import('@huggingface/transformers');
       const rawImg = await RawImage.fromBlob(imageBlob);
       const output = await segmentator(rawImg) as any;
       
@@ -407,7 +427,7 @@ export default function Home() {
       await fetchItems();
       alert('✨ Background removed successfully!');
     } catch (err: any) {
-      console.error('Client-side cutout error:', err);
+      console.error('AI cutout failed:', err);
       alert(`AI Cutout Failed: ${err.message || err}`);
     } finally {
       setCutoutProgress(null);
@@ -2125,7 +2145,7 @@ export default function Home() {
                                            e.target.value = '';
                                            await fetchItems();
                                          } else {
-                                           alert('Failed to replace image.');
+                                           alert('Failed to add image.');
                                          }
                                        } catch (err: any) {
                                          alert(`Error: ${err.message}`);
@@ -4134,16 +4154,13 @@ export default function Home() {
                               if (res.ok) {
                                 setEditingItem({
                                   ...editingItem,
-                                  primary_image_url: data.url,
-                                  images: editingItem.images.map((gImg: any) =>
-                                    gImg.is_primary_profile ? { ...gImg, storage_path: data.url } : gImg
-                                  )
+                                  images: data.images
                                 });
                                 await fetchItems();
                                 setSearchResults(null);
-                                alert('✨ Garment photo successfully replaced!');
+                                alert('✨ Garment photo successfully added to gallery!');
                               } else {
-                                alert(`Failed to replace photo: ${data.error || 'Unknown error'}`);
+                                alert(`Failed to add photo: ${data.error || 'Unknown error'}`);
                               }
                             } catch (err: any) {
                               alert(`Error replacing photo: ${err.message}`);
