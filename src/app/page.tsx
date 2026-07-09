@@ -1334,7 +1334,7 @@ export default function Home() {
 
       {/* CORE WORKSPACE */}
       <main className={`flex-1 flex flex-col lg:flex-row w-full mx-auto p-4 sm:p-6 gap-6 mb-24 lg:mb-0 ${
-        activeTab === 'spreadsheet' ? 'max-w-[98%]' : 'max-w-7xl'
+        activeTab === 'spreadsheet' ? 'max-w-[100%] lg:px-2' : 'max-w-7xl'
       }`}>
         
         {/* DESKTOP SIDEBAR NAV */}
