@@ -19,6 +19,7 @@ interface Garment {
   tonal_value: string | null;
   fabric_type: string | null;
   fit_block: string | null;
+  style_detail: string | null;
   status: 'Active' | 'Archive' | 'Donate' | 'Discard' | 'Processing' | 'Processing_Failed';
   images: GarmentImage[];
   primary_image_url: string | null;
@@ -103,6 +104,8 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [colorFilter, setColorFilter] = useState('All');
+  const [subcategoryFilter, setSubcategoryFilter] = useState('All');
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [editingItem, setEditingItem] = useState<Garment | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -388,7 +391,7 @@ export default function Home() {
         if (!res.ok) throw new Error(data.error || 'Server-side background removal failed.');
         
         await fetchItems();
-        alert('✨ Background removed successfully (processed on server)!');
+        // Background removed success confirmation (no alert popup to avoid unnecessary clicks)
         return;
       }
 
@@ -425,7 +428,7 @@ export default function Home() {
       if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed.');
       
       await fetchItems();
-      alert('✨ Background removed successfully!');
+      // Background removed success confirmation (no alert popup)
     } catch (err: any) {
       console.error('AI cutout failed:', err);
       alert(`AI Cutout Failed: ${err.message || err}`);
@@ -1076,7 +1079,7 @@ export default function Home() {
       });
       if (res.ok) {
         fetchSavedOutfits();
-        alert(`Outfit "${name}" saved successfully!`);
+        // Outfit saved successfully (no alert popup to avoid unnecessary clicks)
       }
     } catch (err) {
       console.error(err);
@@ -1232,10 +1235,34 @@ export default function Home() {
       (item.fabric_type?.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (item.notes?.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesCategory = categoryFilter === 'All' || item.category === categoryFilter;
-    const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
+    // Enhance category checks:
+    // User requested: "top and a bottom and a shoe category, and then, bottom shorts, top long sleeve, top outer layer"
+    // We map UI dropdown filters to category or sub_category matching patterns.
+    let matchesCategory = true;
+    if (categoryFilter !== 'All') {
+      const catLower = categoryFilter.toLowerCase();
+      const itemCatLower = item.category.toLowerCase();
+      const itemSubLower = (item.sub_category || '').toLowerCase();
+      const itemStyleLower = (item.style_detail || '').toLowerCase();
 
-    return matchesSearch && matchesCategory && matchesStatus;
+      if (catLower === 'shoe') {
+        matchesCategory = itemCatLower === 'footwear';
+      } else if (catLower === 'bottom shorts') {
+        matchesCategory = itemCatLower === 'bottoms' && itemSubLower.includes('short');
+      } else if (catLower === 'top long sleeve') {
+        matchesCategory = itemCatLower === 'tops' && (itemStyleLower.includes('long sleeve') || itemSubLower.includes('long sleeve'));
+      } else if (catLower === 'top outer layer') {
+        matchesCategory = itemCatLower === 'outerwear' || (itemCatLower === 'tops' && (itemSubLower.includes('jacket') || itemSubLower.includes('coat') || itemSubLower.includes('sweater') || itemSubLower.includes('cardigan') || itemSubLower.includes('hoodie')));
+      } else {
+        matchesCategory = itemCatLower === catLower;
+      }
+    }
+
+    const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
+    const matchesColor = colorFilter === 'All' || item.color_family?.toLowerCase() === colorFilter.toLowerCase();
+    const matchesSubcategory = subcategoryFilter === 'All' || item.sub_category?.toLowerCase() === subcategoryFilter.toLowerCase();
+
+    return matchesSearch && matchesCategory && matchesStatus && matchesColor && matchesSubcategory;
   });
 
   return (
@@ -1306,7 +1333,9 @@ export default function Home() {
       </header>
 
       {/* CORE WORKSPACE */}
-      <main className="flex-1 flex flex-col lg:flex-row max-w-7xl w-full mx-auto p-4 sm:p-6 gap-6 mb-24 lg:mb-0">
+      <main className={`flex-1 flex flex-col lg:flex-row w-full mx-auto p-4 sm:p-6 gap-6 mb-24 lg:mb-0 ${
+        activeTab === 'spreadsheet' ? 'max-w-[98%]' : 'max-w-7xl'
+      }`}>
         
         {/* DESKTOP SIDEBAR NAV */}
         <aside className="hidden lg:flex flex-col w-60 gap-1.5 p-4 pr-3 bg-[var(--bg-sidebar)] rounded-3xl border border-[#DCD1C0] tactile-shadow-md self-start">
@@ -1667,12 +1696,11 @@ export default function Home() {
                                           });
                                           await fetchItems();
                                           setSearchResults(null);
-                                          alert('✨ Garment photo successfully replaced!');
                                         } else {
-                                          alert(`Failed to replace photo: ${data.error || 'Unknown error'}`);
+                                          console.error(`Failed to replace photo: ${data.error}`);
                                         }
                                       } catch (err: any) {
-                                        alert(`Error replacing photo: ${err.message}`);
+                                        console.error(`Error replacing photo: ${err.message}`);
                                       } finally {
                                         setIsReplacingImage(false);
                                       }
@@ -2072,10 +2100,10 @@ export default function Home() {
             <div className="space-y-6 animate-fade-in">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-2">
                     📊 Wardrobe Spreadsheet Editor
                   </h2>
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-[var(--text-secondary)] font-semibold">
                     Edit garment metadata inline, paste image URLs to replace photos instantly, and perform bulk updates.
                   </p>
                 </div>
@@ -2091,16 +2119,16 @@ export default function Home() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-[#EFEAE2] border-b border-[#DCD1C0] text-[var(--text-primary)] font-extrabold uppercase tracking-wider text-[10px] select-none">
-                      <th className="p-3 w-[100px]">Image</th>
-                      <th className="p-3 min-w-[90px]">Brand</th>
-                      <th className="p-3 w-[88px]">Category</th>
-                      <th className="p-3 min-w-[90px]">Sub-Cat</th>
-                      <th className="p-3 min-w-[70px]">Color</th>
-                      <th className="p-3 min-w-[100px]">Fabric</th>
-                      <th className="p-3 min-w-[80px]">Fit</th>
-                      <th className="p-3 w-[64px]">$ Price</th>
-                      <th className="p-3 w-[60px]">Year</th>
-                      <th className="p-3 text-right w-[90px]">Actions</th>
+                      <th className="p-3">Image</th>
+                      <th className="p-3">Brand</th>
+                      <th className="p-3">Category</th>
+                      <th className="p-3">Sub-Cat</th>
+                      <th className="p-3">Color</th>
+                      <th className="p-3">Fabric</th>
+                      <th className="p-3">Fit</th>
+                      <th className="p-3">$ Price</th>
+                      <th className="p-3">Year</th>
+                      <th className="p-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EAE5D9]/65 bg-white">
@@ -2199,12 +2227,25 @@ export default function Home() {
                             </td>
                             {/* Color */}
                             <td className="p-3">
-                              <input
-                                type="text"
-                                value={colorVal}
-                                onChange={(e) => handleSpreadsheetFieldChange(item.id, 'color_family', e.target.value)}
-                                className="w-full text-[11px] bg-white border border-stone-200 rounded px-2.5 py-1.5 text-stone-800 focus:outline-none focus:border-[var(--accent-terracotta)]"
-                              />
+                              <div className="flex items-center gap-1.5 min-w-[130px]">
+                                <span 
+                                  className="w-3.5 h-3.5 rounded-full border border-stone-300 shadow-inner shrink-0"
+                                  style={{ backgroundColor: (editedItems[item.id]?.hex_code !== undefined ? editedItems[item.id]?.hex_code : item.hex_code) || '#cccccc' }}
+                                />
+                                <input
+                                  type="color"
+                                  value={(editedItems[item.id]?.hex_code !== undefined ? editedItems[item.id]?.hex_code : item.hex_code) || '#cccccc'}
+                                  onChange={(e) => handleSpreadsheetFieldChange(item.id, 'hex_code', e.target.value)}
+                                  className="w-5 h-5 border-0 p-0 rounded-full cursor-pointer overflow-hidden shrink-0"
+                                  title="Pick exact color shade"
+                                />
+                                <input
+                                  type="text"
+                                  value={colorVal}
+                                  onChange={(e) => handleSpreadsheetFieldChange(item.id, 'color_family', e.target.value)}
+                                  className="w-full text-[11px] bg-white border border-stone-200 rounded px-2 py-1 text-stone-800 focus:outline-none focus:border-[var(--accent-terracotta)]"
+                                />
+                              </div>
                             </td>
                             {/* Fabric Blend */}
                             <td className="p-3">
@@ -2282,11 +2323,11 @@ export default function Home() {
           {activeTab === 'closet' && (
             <div className="space-y-6">
               
-              <div className="flex border-b border-zinc-800 gap-6 overflow-x-auto scrollbar-none whitespace-nowrap pb-1">
+              <div className="flex border-b border-[#EAE5D9] gap-6 overflow-x-auto scrollbar-none whitespace-nowrap pb-1">
                 <button
                   onClick={() => setClosetSubTab('items')}
                   className={`pb-2.5 text-xs font-bold uppercase tracking-wider transition ${
-                    closetSubTab === 'items' ? 'border-b-2 border-teal-400 text-teal-400' : 'text-zinc-500 hover:text-white'
+                    closetSubTab === 'items' ? 'border-b-2 border-[var(--accent-terracotta)] text-[var(--accent-terracotta)]' : 'text-stone-500 hover:text-stone-850'
                   }`}
                 >
                   Garments ({items.length})
@@ -2294,7 +2335,7 @@ export default function Home() {
                 <button
                   onClick={() => setClosetSubTab('outfits')}
                   className={`pb-2.5 text-xs font-bold uppercase tracking-wider transition ${
-                    closetSubTab === 'outfits' ? 'border-b-2 border-teal-400 text-teal-400' : 'text-zinc-500 hover:text-white'
+                    closetSubTab === 'outfits' ? 'border-b-2 border-[var(--accent-terracotta)] text-[var(--accent-terracotta)]' : 'text-stone-500 hover:text-stone-850'
                   }`}
                 >
                   Saved Outfits ({savedOutfits.length})
@@ -2302,7 +2343,7 @@ export default function Home() {
                 <button
                   onClick={() => setClosetSubTab('locker')}
                   className={`pb-2.5 text-xs font-bold uppercase tracking-wider transition ${
-                    closetSubTab === 'locker' ? 'border-b-2 border-teal-400 text-teal-400' : 'text-zinc-500 hover:text-white'
+                    closetSubTab === 'locker' ? 'border-b-2 border-[var(--accent-terracotta)] text-[var(--accent-terracotta)]' : 'text-stone-500 hover:text-stone-850'
                   }`}
                 >
                   📏 Sizing Locker ({measurements.length})
@@ -2310,7 +2351,7 @@ export default function Home() {
                 <button
                   onClick={() => setClosetSubTab('analytics')}
                   className={`pb-2.5 text-xs font-bold uppercase tracking-wider transition ${
-                    closetSubTab === 'analytics' ? 'border-b-2 border-teal-400 text-teal-400' : 'text-zinc-500 hover:text-white'
+                    closetSubTab === 'analytics' ? 'border-b-2 border-[var(--accent-terracotta)] text-[var(--accent-terracotta)]' : 'text-stone-500 hover:text-stone-850'
                   }`}
                 >
                   🔍 Gap Finder
@@ -2318,7 +2359,7 @@ export default function Home() {
                 <button
                   onClick={() => setClosetSubTab('guide')}
                   className={`pb-2.5 text-xs font-bold uppercase tracking-wider transition ${
-                    closetSubTab === 'guide' ? 'border-b-2 border-teal-400 text-teal-400' : 'text-zinc-500 hover:text-white'
+                    closetSubTab === 'guide' ? 'border-b-2 border-[var(--accent-terracotta)] text-[var(--accent-terracotta)]' : 'text-stone-500 hover:text-stone-850'
                   }`}
                 >
                   📖 Style Guide
@@ -2328,22 +2369,25 @@ export default function Home() {
               {closetSubTab === 'items' && (
                 <div className="space-y-6">
                   {/* Filters bar */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border border-zinc-800 bg-[#1f2833]/10 rounded-2xl">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border border-[#EAE5D9] bg-white rounded-3xl shadow-sm">
                     <div className="flex-1 min-w-[200px]">
                       <input
                         type="text"
                         placeholder="Search items, brands, materials..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-[#0b0c10]/80 text-xs border border-zinc-800 rounded-xl px-4 py-2 text-white focus:outline-none"
+                        className="w-full bg-[#F5F2EB] text-xs border border-[#EAE5D9] rounded-xl px-4 py-2 text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40"
                       />
                     </div>
                     
                     <div className="flex flex-wrap items-center gap-3">
                       <select
                         value={categoryFilter}
-                        onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-xs font-semibold text-zinc-300"
+                        onChange={(e) => {
+                          setCategoryFilter(e.target.value);
+                          setSubcategoryFilter('All');
+                        }}
+                        className="bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
                       >
                         <option value="All">All Categories</option>
                         <option value="Tops">Tops</option>
@@ -2351,12 +2395,44 @@ export default function Home() {
                         <option value="Outerwear">Outerwear</option>
                         <option value="Footwear">Footwear</option>
                         <option value="Tailoring">Tailoring</option>
+                        <option value="Shoe">Shoes</option>
+                        <option value="Bottom Shorts">Bottom Shorts</option>
+                        <option value="Top Long Sleeve">Top Long Sleeve</option>
+                        <option value="Top Outer Layer">Top Outer Layer</option>
+                      </select>
+
+                      {/* Color Filter */}
+                      <select
+                        value={colorFilter}
+                        onChange={(e) => setColorFilter(e.target.value)}
+                        className="bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
+                      >
+                        <option value="All">All Colors</option>
+                        {Array.from(new Set(items.map(i => i.color_family).filter(Boolean))).map(col => (
+                          <option key={col} value={col}>{col}</option>
+                        ))}
+                      </select>
+
+                      {/* Subcategory Filter */}
+                      <select
+                        value={subcategoryFilter}
+                        onChange={(e) => setSubcategoryFilter(e.target.value)}
+                        className="bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
+                      >
+                        <option value="All">All Subcategories</option>
+                        {Array.from(new Set(items
+                          .filter(i => categoryFilter === 'All' || i.category === categoryFilter)
+                          .map(i => i.sub_category)
+                          .filter(Boolean)
+                        )).map(sub => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
                       </select>
 
                       <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-xs font-semibold text-zinc-300"
+                        className="bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
                       >
                         <option value="All">All Statuses</option>
                         <option value="Active">Active Closet</option>
@@ -2365,16 +2441,16 @@ export default function Home() {
                         <option value="Processing">Processing...</option>
                       </select>
 
-                      <div className="flex rounded-lg bg-zinc-950 p-1 border border-zinc-850">
+                      <div className="flex rounded-xl bg-[#F5F2EB] p-1 border border-[#EAE5D9]">
                         <button
                           onClick={() => setViewMode('grid')}
-                          className={`p-1.5 rounded transition ${viewMode === 'grid' ? 'bg-zinc-800 text-teal-400' : 'text-zinc-500'}`}
+                          className={`p-1.5 px-3 rounded-lg text-[10px] uppercase font-black transition ${viewMode === 'grid' ? 'bg-[var(--accent-terracotta)] text-white' : 'text-[var(--text-secondary)]'}`}
                         >
                           Grid
                         </button>
                         <button
                           onClick={() => setViewMode('matrix')}
-                          className={`p-1.5 rounded transition ${viewMode === 'matrix' ? 'bg-zinc-800 text-teal-400' : 'text-zinc-500'}`}
+                          className={`p-1.5 px-3 rounded-lg text-[10px] uppercase font-black transition ${viewMode === 'matrix' ? 'bg-[var(--accent-terracotta)] text-white' : 'text-[var(--text-secondary)]'}`}
                         >
                           Matrix
                         </button>
@@ -2390,7 +2466,7 @@ export default function Home() {
                       <p className="text-[var(--text-secondary)] text-xs">No matching garments found in your closet.</p>
                     </div>
                   ) : viewMode === 'grid' ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                       {filteredItems.map((item) => (
                         <div 
                           key={item.id}
@@ -2408,6 +2484,24 @@ export default function Home() {
                           />
 
                           <div className="relative w-full aspect-square bg-[#FBFBFA] border-b border-[#EAE5D9] flex items-center justify-center p-2.5">
+                            {/* Color Dot Swatch Overlay */}
+                            <div 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingItem(item);
+                              }}
+                              className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-white/95 border border-[#EAE5D9] px-2 py-1 rounded-full shadow-xs cursor-pointer hover:bg-stone-50 active:scale-95 transition"
+                              title={`Color: ${item.color_family}. Click to customize.`}
+                            >
+                              <span 
+                                className="w-3.5 h-3.5 rounded-full border border-stone-300 shadow-inner shrink-0"
+                                style={{ backgroundColor: item.hex_code || '#cccccc' }}
+                              />
+                              <span className="text-[7.5px] font-black uppercase text-[var(--text-primary)] max-w-[54px] truncate">
+                                {item.color_family}
+                              </span>
+                            </div>
+
                             {item.primary_image_url ? (
                               <img src={item.primary_image_url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
                             ) : (
@@ -2429,7 +2523,14 @@ export default function Home() {
 
                           <div className="p-3.5 space-y-1">
                             <div className="flex items-center justify-between text-[8px] uppercase font-extrabold text-[var(--text-secondary)]">
-                              <span>{item.sub_category}</span>
+                              <div className="flex items-center gap-1">
+                                <span>{item.sub_category}</span>
+                                {item.style_detail && (
+                                  <span className="bg-[#FAF8F5] border border-[#EAE5D9] px-1 rounded text-[7px] text-[var(--accent-terracotta)] font-bold lowercase">
+                                    {item.style_detail}
+                                  </span>
+                                )}
+                              </div>
                               {getItemWornCount(item.id) > 0 && (
                                 <span className="text-[var(--accent-sage)] font-black">Worn {getItemWornCount(item.id)}x</span>
                               )}
@@ -2472,12 +2573,25 @@ export default function Home() {
                               )}
                             </div>
                             <div className="min-w-0">
-                              <span className="text-[8px] font-black uppercase text-[var(--text-secondary)] tracking-wider">{item.category}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[8px] font-black uppercase text-[var(--text-secondary)] tracking-wider">{item.category}</span>
+                                <span 
+                                  className="w-2.5 h-2.5 rounded-full border border-stone-300 shadow-inner"
+                                  style={{ backgroundColor: item.hex_code || '#cccccc' }}
+                                  title={item.color_family}
+                                />
+                                <span className="text-[8px] font-bold text-[var(--text-secondary)]">{item.color_family}</span>
+                              </div>
                               <h4 className="text-xs font-extrabold text-[var(--text-primary)] truncate mt-0.5">
-                                {item.brand ? `${item.brand} ` : ''}{item.color_family} {item.sub_category}
+                                {item.brand ? `${item.brand} ` : ''}{item.sub_category}
                               </h4>
                               {/* Style specs into rounded textile tags */}
                               <div className="flex items-center gap-1.5 mt-1">
+                                {item.style_detail && (
+                                  <span className="text-[8px] font-black uppercase bg-[var(--bg-card-secondary)] text-[var(--accent-terracotta)] px-2 py-0.5 rounded-full border border-[#EAE5D9]">
+                                    Style: {item.style_detail}
+                                  </span>
+                                )}
                                 <span className="text-[8px] font-black uppercase bg-[var(--bg-card-secondary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-full border border-[#EAE5D9]">
                                   Fabric: {item.fabric_type || 'N/A'}
                                 </span>
@@ -2517,14 +2631,14 @@ export default function Home() {
 
                   {/* Bulk bar */}
                   {selectedItemIds.length > 0 && (
-                    <div className="fixed bottom-16 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#1f2833] border border-zinc-700 shadow-2xl rounded-full px-5 py-3 text-xs font-semibold text-white">
-                      <span>Selected {selectedItemIds.length} items:</span>
-                      <div className="h-4 w-[1px] bg-zinc-750"></div>
-                      <button onClick={() => handleBulkChangeStatus('Active')} className="text-teal-400">Keep</button>
-                      <button onClick={() => handleBulkChangeStatus('Archive')} className="text-amber-400">Archive</button>
-                      <button onClick={() => handleBulkChangeStatus('Donate')} className="text-indigo-400">Donate</button>
-                      <div className="h-4 w-[1px] bg-zinc-750"></div>
-                      <button onClick={handleBulkDelete} className="text-rose-400">Delete</button>
+                    <div className="fixed bottom-16 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3.5 bg-white border border-[#EAE5D9] shadow-2xl rounded-full px-5 py-3 text-xs font-bold text-[var(--text-primary)] animate-fade-in">
+                      <span>Selected <strong className="text-[var(--accent-terracotta)]">{selectedItemIds.length}</strong> items:</span>
+                      <div className="h-4 w-[1px] bg-[#EAE5D9]"></div>
+                      <button onClick={() => handleBulkChangeStatus('Active')} className="text-[var(--accent-sage)] font-extrabold hover:underline">Keep</button>
+                      <button onClick={() => handleBulkChangeStatus('Archive')} className="text-amber-600 font-extrabold hover:underline">Archive</button>
+                      <button onClick={() => handleBulkChangeStatus('Donate')} className="text-stone-500 font-extrabold hover:underline">Donate</button>
+                      <div className="h-4 w-[1px] bg-[#EAE5D9]"></div>
+                      <button onClick={handleBulkDelete} className="text-rose-600 font-extrabold hover:underline">Delete</button>
                     </div>
                   )}
                 </div>
@@ -2534,10 +2648,10 @@ export default function Home() {
               {closetSubTab === 'outfits' && (
                 <div className="space-y-6">
                   {loadingOutfits ? (
-                    <div className="text-center py-12"><p className="text-zinc-500 text-xs">Loading outfits...</p></div>
+                    <div className="text-center py-12"><p className="text-[var(--text-secondary)] text-xs">Loading outfits...</p></div>
                   ) : savedOutfits.length === 0 ? (
-                    <div className="text-center py-12 border border-zinc-800/40 border-dashed rounded-xl bg-zinc-900/10">
-                      <p className="text-zinc-500 text-xs">No saved outfits yet. Generate some in the AI Stylist tab!</p>
+                    <div className="text-center py-12 border border-[#EAE5D9] border-dashed rounded-3xl bg-white/40">
+                      <p className="text-[var(--text-secondary)] text-xs">No saved outfits yet. Generate some in the AI Stylist tab!</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2547,13 +2661,13 @@ export default function Home() {
                           .filter((item): item is Garment => !!item);
 
                         return (
-                          <div key={outfit.id} className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                          <div key={outfit.id} className="border border-[#EAE5D9] bg-white rounded-3xl p-5 flex flex-col justify-between space-y-4 shadow-xl shadow-stone-200/30">
                             <div>
-                              <div className="flex justify-between items-start mb-3">
-                                <h3 className="text-sm font-bold text-white">{outfit.name}</h3>
+                              <div className="flex justify-between items-start mb-3 border-b border-[#F5F2EB] pb-2">
+                                <h3 className="text-sm font-extrabold text-[var(--text-primary)]">{outfit.name}</h3>
                                 <button 
                                   onClick={() => deleteSavedOutfit(outfit.id)}
-                                  className="text-xs font-semibold text-rose-400 hover:text-rose-300"
+                                  className="text-xs font-extrabold text-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]/80"
                                 >
                                   Delete
                                 </button>
@@ -2561,19 +2675,19 @@ export default function Home() {
 
                               <div className="grid grid-cols-3 gap-2 mb-3">
                                 {outfitItems.map(oi => (
-                                  <div key={oi.id} className="border border-zinc-800 bg-black rounded-lg overflow-hidden flex flex-col">
+                                  <div key={oi.id} className="border border-[#EAE5D9] bg-[#FBFBFA] rounded-2xl overflow-hidden flex flex-col">
                                     <div className="relative aspect-square w-full">
-                                      <img src={oi.primary_image_url || ''} alt="" className="object-cover w-full h-full" />
+                                      <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
                                     </div>
-                                    <div className="p-1 text-center bg-zinc-950">
-                                      <p className="text-[8px] font-bold text-zinc-400 truncate">{oi.sub_category}</p>
+                                    <div className="p-1 text-center bg-[#F5F2EB] border-t border-[#EAE5D9]">
+                                      <p className="text-[8px] font-black text-[var(--text-secondary)] truncate">{oi.sub_category}</p>
                                     </div>
                                   </div>
                                 ))}
                               </div>
 
                               {outfit.styling_reasoning && (
-                                <p className="text-xs text-zinc-400 leading-relaxed">{outfit.styling_reasoning}</p>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-semibold">{outfit.styling_reasoning}</p>
                               )}
                             </div>
                           </div>
@@ -2586,10 +2700,10 @@ export default function Home() {
 
               {/* MEASUREMENTS LOCKER SUB-TAB */}
               {closetSubTab === 'locker' && (
-                <div className="space-y-6 animate-fade-in">
-                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
-                    <h3 className="text-sm font-bold text-white">📏 Sizing & Measurements Locker</h3>
-                    <p className="text-zinc-400 text-xs leading-relaxed">
+                <div className="space-y-6 animate-fade-in text-[var(--text-primary)]">
+                  <div className="border border-[#EAE5D9] bg-white rounded-3xl p-6 shadow-xl shadow-stone-200/40">
+                    <h3 className="text-sm font-extrabold text-[var(--text-primary)]">📏 Sizing & Measurements Locker</h3>
+                    <p className="text-[var(--text-secondary)] text-xs leading-relaxed mb-4">
                       Store your exact body sizes and reference measurements of garments that fit you perfectly. Reference them anytime when shopping!
                     </p>
 
@@ -2622,24 +2736,24 @@ export default function Home() {
                           console.error(err);
                         }
                       }}
-                      className="space-y-3 pt-3 border-t border-zinc-850"
+                      className="space-y-4 pt-4 border-t border-[#EAE5D9]"
                     >
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-zinc-550">Label / Name</label>
+                          <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Label / Name</label>
                           <input 
                             name="label" 
                             type="text" 
                             required 
                             placeholder="e.g. My Body, Favorite Overshirt" 
-                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2.5 text-xs text-white"
+                            className="w-full bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl p-3 text-xs text-[var(--text-primary)] placeholder-stone-400 focus:outline-none"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-zinc-550">Measurement Type</label>
+                          <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Measurement Type</label>
                           <select 
                             name="type" 
-                            className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2.5 text-xs text-white"
+                            className="w-full bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl p-3 text-xs text-[var(--text-primary)] focus:outline-none"
                           >
                             <option value="body">Personal Body Sizes</option>
                             <option value="garment">Flat-Laid Garment Sizes</option>
@@ -2647,36 +2761,36 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                      <div className="grid grid-cols-3 md:grid-cols-6 gap-2.5">
                         <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-bold text-zinc-550">Chest (")</label>
-                          <input name="chest" type="text" placeholder='e.g. 40' className="w-full bg-[#0b0c10] border border-zinc-850 rounded p-1.5 text-xs text-center text-white" />
+                          <label className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">Chest (")</label>
+                          <input name="chest" type="text" placeholder='e.g. 40' className="w-full bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl p-2 text-xs text-center text-[var(--text-primary)] focus:outline-none" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-bold text-zinc-550">Waist (")</label>
-                          <input name="waist" type="text" placeholder='e.g. 32' className="w-full bg-[#0b0c10] border border-zinc-855 rounded p-1.5 text-xs text-center text-white" />
+                          <label className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">Waist (")</label>
+                          <input name="waist" type="text" placeholder='e.g. 32' className="w-full bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl p-2 text-xs text-center text-[var(--text-primary)] focus:outline-none" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-bold text-zinc-550">Inseam (")</label>
-                          <input name="inseam" type="text" placeholder='e.g. 30' className="w-full bg-[#0b0c10] border border-zinc-855 rounded p-1.5 text-xs text-center text-white" />
+                          <label className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">Inseam (")</label>
+                          <input name="inseam" type="text" placeholder='e.g. 30' className="w-full bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl p-2 text-xs text-center text-[var(--text-primary)] focus:outline-none" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-bold text-zinc-550">Sleeve (")</label>
-                          <input name="sleeve" type="text" placeholder='e.g. 34' className="w-full bg-[#0b0c10] border border-zinc-855 rounded p-1.5 text-xs text-center text-white" />
+                          <label className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">Sleeve (")</label>
+                          <input name="sleeve" type="text" placeholder='e.g. 34' className="w-full bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl p-2 text-xs text-center text-[var(--text-primary)] focus:outline-none" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-bold text-zinc-550">Shoulder (")</label>
-                          <input name="shoulder" type="text" placeholder='e.g. 18' className="w-full bg-[#0b0c10] border border-zinc-855 rounded p-1.5 text-xs text-center text-white" />
+                          <label className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">Shoulder (")</label>
+                          <input name="shoulder" type="text" placeholder='e.g. 18' className="w-full bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl p-2 text-xs text-center text-[var(--text-primary)] focus:outline-none" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-bold text-zinc-550">Length (")</label>
-                          <input name="length" type="text" placeholder='e.g. 28' className="w-full bg-[#0b0c10] border border-zinc-855 rounded p-1.5 text-xs text-center text-white" />
+                          <label className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">Length (")</label>
+                          <input name="length" type="text" placeholder='e.g. 28' className="w-full bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl p-2 text-xs text-center text-[var(--text-primary)] focus:outline-none" />
                         </div>
                       </div>
 
                       <button
                         type="submit"
-                        className="w-full py-2.5 text-xs font-black bg-teal-400 text-zinc-950 rounded-xl active:scale-[0.98] transition shadow"
+                        className="w-full py-3 text-xs font-extrabold bg-[var(--accent-terracotta)] text-white rounded-full active:scale-[0.98] transition shadow-md duration-200"
                       >
                         💾 Save to Locker
                       </button>
@@ -2685,17 +2799,17 @@ export default function Home() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {measurements.map((m) => (
-                      <div key={m.id} className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl flex flex-col justify-between space-y-3">
+                      <div key={m.id} className="p-5 bg-white border border-[#EAE5D9] rounded-3xl flex flex-col justify-between space-y-4 shadow-sm">
                         <div className="flex justify-between items-start">
                           <div>
-                            <span className={`text-[8px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                            <span className={`text-[8px] uppercase font-black px-2 py-0.5 rounded-full ${
                               m.measurement_type === 'body' 
-                                ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                                : 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
+                                ? 'bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/20' 
+                                : 'bg-[var(--accent-sage)]/10 text-[var(--accent-sage)] border border-[var(--accent-sage)]/20'
                             }`}>
                               {m.measurement_type}
                             </span>
-                            <h4 className="text-sm font-bold text-white mt-1.5">{m.label}</h4>
+                            <h4 className="text-sm font-extrabold text-[var(--text-primary)] mt-2">{m.label}</h4>
                           </div>
                           <button
                             onClick={async () => {
@@ -2706,18 +2820,18 @@ export default function Home() {
                                 console.error(err);
                               }
                             }}
-                            className="text-xs text-rose-400 hover:text-rose-300 font-bold"
+                            className="text-xs text-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]/80 font-extrabold"
                           >
                             Delete
                           </button>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 bg-[#1f2833]/10 border border-zinc-850 rounded-xl p-3 text-[10px]">
+                        <div className="grid grid-cols-3 gap-2 bg-[#F5F2EB] border border-[#EAE5D9] rounded-2xl p-3 text-[10px]">
                           {Object.entries(m.details as Record<string, any>).map(([key, val]) => (
                             val ? (
                               <div key={key} className="text-center">
-                                <span className="text-zinc-550 uppercase text-[8px] block font-bold">{key}</span>
-                                <span className="text-white font-black font-mono">{String(val)}"</span>
+                                <span className="text-[var(--text-secondary)] uppercase text-[8px] block font-bold">{key}</span>
+                                <span className="text-[var(--text-primary)] font-black font-mono">{String(val)}"</span>
                               </div>
                             ) : null
                           ))}
@@ -2870,8 +2984,12 @@ export default function Home() {
                           );
                         })()}
                       </div>
+                    </div>
+                  </div>
 
-                      {/* Classic Formulas */}
+                  {/* COLOR FORMULAS LEDGER */}
+                  <div className="border border-[#EAE5D9] bg-white rounded-3xl p-5 space-y-4 tactile-shadow-sm">
+                    <div className="grid grid-cols-1 gap-4">
                       <div className="p-4 bg-[var(--bg-card-secondary)]/50 border border-[#EAE5D9] rounded-2xl space-y-3.5">
                         <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)] tracking-wider">Color Formulas Checklist</span>
                         {items.length === 0 ? (
@@ -2952,71 +3070,70 @@ export default function Home() {
                           );
                         })()}
                       </div>
-
                     </div>
                   </div>
 
                   {/* DYNAMIC SHOPPING LIST CARD */}
-                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <div className="border border-[#EAE5D9] bg-white rounded-3xl p-5 space-y-4 tactile-shadow-sm">
+                    <h3 className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-2">
                       <span>🛒 Curation Shopping List (Wardrobe Gaps to Fill)</span>
                     </h3>
-                    <p className="text-zinc-400 text-xs">
+                    <p className="text-[var(--text-secondary)] text-xs font-semibold">
                       These shopping recommendations are dynamically generated to unlock the maximum number of color formulas and category coordinates in your closet.
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       
                       {/* Category Gaps */}
-                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-amber-400">Category Essentials Gaps</span>
-                        <div className="space-y-2 text-xs font-medium text-zinc-300">
+                      <div className="p-4 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-3">
+                        <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)]">Category Essentials Gaps</span>
+                        <div className="space-y-2 text-xs font-semibold text-[var(--text-primary)]">
                           {items.filter(i => i.category === 'Footwear').length === 0 && (
-                            <div className="flex items-start gap-2 bg-rose-950/15 border border-rose-500/10 p-2.5 rounded-lg text-rose-450">
+                            <div className="flex items-start gap-2 bg-[var(--accent-terracotta)]/10 border border-[var(--accent-terracotta)]/20 p-2.5 rounded-xl">
                               <span>👟</span>
                               <div>
-                                <p className="font-bold text-[11px] text-white">Add Footwear</p>
-                                <p className="text-[10px] text-zinc-400 mt-0.5">Missing shoes. Add white minimalist leather sneakers or dark brown suede chelsea boots to tie bottoms coordinates together.</p>
+                                <p className="font-extrabold text-[11px] text-[var(--text-primary)]">Add Footwear</p>
+                                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Missing shoes. Add white minimalist leather sneakers or dark brown suede chelsea boots to tie bottoms coordinates together.</p>
                               </div>
                             </div>
                           )}
                           {items.filter(i => i.category === 'Tailoring').length === 0 && (
-                            <div className="flex items-start gap-2 bg-amber-950/15 border border-amber-500/10 p-2.5 rounded-lg text-amber-450">
+                            <div className="flex items-start gap-2 bg-[var(--accent-apricot)]/10 border border-[var(--accent-apricot)]/20 p-2.5 rounded-xl">
                               <span>🧥</span>
                               <div>
-                                <p className="font-bold text-[11px] text-white">Add Tailoring</p>
-                                <p className="text-[10px] text-zinc-400 mt-0.5">Missing blazers. Add a textured grey tweed or structured navy wool blazer to elevate casual denim and knitwear.</p>
+                                <p className="font-extrabold text-[11px] text-[var(--text-primary)]">Add Tailoring</p>
+                                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Missing blazers. Add a textured grey tweed or structured navy wool blazer to elevate casual denim and knitwear.</p>
                               </div>
                             </div>
                           )}
                           {items.filter(i => i.category === 'Outerwear').length === 0 && (
-                            <div className="flex items-start gap-2 bg-zinc-900 border border-zinc-855 p-2.5 rounded-lg text-zinc-300">
+                            <div className="flex items-start gap-2 bg-[#FAF8F5] border border-[#EAE5D9] p-2.5 rounded-xl text-[var(--text-primary)]">
                               <span>🧥</span>
                               <div>
-                                <p className="font-bold text-[11px] text-white">Add Outerwear Layer</p>
-                                <p className="text-[10px] text-zinc-400 mt-0.5">Add a classic olive field jacket or charcoal overcoat to introduce layering silhouettes.</p>
+                                <p className="font-extrabold text-[11px] text-[var(--text-primary)]">Add Outerwear Layer</p>
+                                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Add a classic olive field jacket or charcoal overcoat to introduce layering silhouettes.</p>
                               </div>
                             </div>
                           )}
                           {items.filter(i => i.category === 'Bottoms').length === 0 && (
-                            <div className="flex items-start gap-2 bg-rose-950/15 border border-rose-500/10 p-2.5 rounded-lg text-rose-450">
+                            <div className="flex items-start gap-2 bg-[var(--accent-terracotta)]/10 border border-[var(--accent-terracotta)]/20 p-2.5 rounded-xl">
                               <span>👖</span>
                               <div>
-                                <p className="font-bold text-[11px] text-white">Add Bottoms</p>
-                                <p className="text-[10px] text-zinc-400 mt-0.5">Add raw denim jeans or charcoal wool trousers to build basic styling blocks.</p>
+                                <p className="font-extrabold text-[11px] text-[var(--text-primary)]">Add Bottoms</p>
+                                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Add raw denim jeans or charcoal wool trousers to build basic styling blocks.</p>
                               </div>
                             </div>
                           )}
                           {items.filter(i => i.category === 'Footwear').length > 0 && items.filter(i => i.category === 'Tailoring').length > 0 && items.filter(i => i.category === 'Outerwear').length > 0 && items.filter(i => i.category === 'Bottoms').length > 0 && (
-                            <p className="text-zinc-550 text-[11px]">✓ You own all essential wardrobe category blocks!</p>
+                            <p className="text-[var(--text-secondary)] text-[11px] font-black">✓ You own all essential wardrobe category blocks!</p>
                           )}
                         </div>
                       </div>
 
                       {/* Color Swatch Gaps */}
-                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-teal-400">Color Swatch Gaps (Based on Formula Misses)</span>
-                        <div className="space-y-2 text-xs font-medium text-zinc-300">
+                      <div className="p-4 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-3">
+                        <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)]">Color Swatch Gaps</span>
+                        <div className="space-y-2 text-xs font-semibold text-[var(--text-primary)]">
                           {(() => {
                             const families = items.map(i => (i.color_family || '').toLowerCase());
                             const missingReccos = [];
@@ -3025,34 +3142,34 @@ export default function Home() {
                               missingReccos.push({ color: "Olive Green / Sage", formula: "Earthy Tonal / Sage & Sand", suggestion: "Add an olive overshirt or chinos to anchor warm earth-toned palettes." });
                             }
                             if (!families.some(f => f.match(/beige|cream|khaki|sand/))) {
-                              missingReccos.push({ color: "Beige / Cream / Sand", formula: "Earthy Tonal / Sage & Sand / Autumnal Warmth", suggestion: "Add sand trousers or a cream knit sweater to soften monochrome blocks." });
+                              missingReccos.push({ color: "Beige / Cream / Sand", formula: "Earthy Tonal / Sage & Sand", suggestion: "Add sand trousers or a cream knit sweater to soften monochrome blocks." });
                             }
                             if (!families.some(f => f.includes('white'))) {
                               missingReccos.push({ color: "White / Off-White", formula: "Earthy Tonal / High Contrast", suggestion: "Add a crisp white cotton tee or off-white button-down shirt for layering contrast." });
                             }
                             if (!families.some(f => f.includes('navy') || f.includes('blue'))) {
-                              missingReccos.push({ color: "Navy Blue", formula: "Modern Navy / Classic Prep", suggestion: "Add a navy crewneck or blazer. Navy functions as a soft neutral that coordinates with everything." });
+                              missingReccos.push({ color: "Navy Blue", formula: "Modern Navy / Classic Prep", suggestion: "Add a navy crewneck or blazer. Navy functions as a soft neutral." });
                             }
                             if (!families.some(f => f.includes('grey') || f.includes('gray'))) {
-                              missingReccos.push({ color: "Grey / Charcoal", formula: "Modern Navy / High Contrast / Monochromatic Slate", suggestion: "Add grey flannels or a charcoal hoodie. Grey absorbs surrounding colors smoothly." });
+                              missingReccos.push({ color: "Grey / Charcoal", formula: "Modern Navy / High Contrast", suggestion: "Add grey flannels or a charcoal hoodie. Grey absorbs surrounding colors smoothly." });
                             }
                             if (!families.some(f => f.match(/burgundy|rust|camel|brown/))) {
                               missingReccos.push({ color: "Burgundy / Rust / Camel", formula: "Autumnal Warmth", suggestion: "Add a camel overcoat or rust knitwear to inject a rich autumnal accent hue." });
                             }
 
                             if (missingReccos.length === 0) {
-                              return <p className="text-zinc-550 text-[11px]">✓ You own all essential neutral and accent colors!</p>;
+                              return <p className="text-[var(--text-secondary)] text-[11px] font-black">✓ You own all essential neutral and accent colors!</p>;
                             }
 
                             return (
                               <div className="space-y-2 max-h-[25vh] overflow-y-auto pr-1">
                                 {missingReccos.slice(0, 3).map(r => (
-                                  <div key={r.color} className="p-2 bg-zinc-950/40 border border-zinc-850 rounded text-[10px] space-y-0.5">
+                                  <div key={r.color} className="p-2 bg-white border border-[#EAE5D9] rounded-xl text-[10px] space-y-0.5">
                                     <div className="flex justify-between items-center">
-                                      <span className="font-bold text-white">{r.color}</span>
-                                      <span className="text-[7px] text-zinc-500 uppercase font-black">{r.formula}</span>
+                                      <span className="font-extrabold text-[var(--text-primary)]">{r.color}</span>
+                                      <span className="text-[7px] text-[var(--accent-terracotta)] uppercase font-black">{r.formula}</span>
                                     </div>
-                                    <p className="text-zinc-400 text-[9px] leading-relaxed">{r.suggestion}</p>
+                                    <p className="text-[var(--text-secondary)] text-[9px] leading-relaxed font-bold">{r.suggestion}</p>
                                   </div>
                                 ))}
                               </div>
@@ -3065,21 +3182,21 @@ export default function Home() {
                   </div>
 
                   {/* PROPORTIONAL & TEXTURAL HARMONY PANEL */}
-                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <div className="border border-[#EAE5D9] bg-white rounded-3xl p-5 space-y-4 tactile-shadow-sm">
+                    <h3 className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-2">
                       <span>🎭 Silhouette, Texture & Proportion Rules</span>
                     </h3>
-                    <p className="text-zinc-400 text-xs">
+                    <p className="text-[var(--text-secondary)] text-xs font-semibold">
                       Evaluating style pairings that rely on proportions, texture contrasts, and physical silhouettes rather than simple color wheels.
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       
                       {/* The Sandwich Rule */}
-                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-teal-400">The Sandwich Rule Matcher</span>
+                      <div className="p-4 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-3">
+                        <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)]">The Sandwich Rule Matcher</span>
                         {items.length === 0 ? (
-                          <span className="text-zinc-500 text-xs">Awaiting closet items.</span>
+                          <span className="text-[var(--text-secondary)] text-xs">Awaiting closet items.</span>
                         ) : (() => {
                           const outerColors = items.filter(i => i.category === 'Outerwear' || i.category === 'Tops').map(i => (i.color_family || '').toLowerCase());
                           const shoeColors = items.filter(i => i.category === 'Footwear').map(i => (i.color_family || '').toLowerCase());
@@ -3089,27 +3206,27 @@ export default function Home() {
 
                           if (uniqueMatches.length === 0) {
                             return (
-                              <div className="space-y-1.5 text-[10px] text-zinc-400 leading-relaxed font-medium">
-                                <p className="text-amber-400 font-bold">⚠️ Sandwich Color Contrast Unavailable</p>
-                                <p>You have no matching top-layer and footwear colors. Try registering shoes in the same color family as your jackets or shirts (e.g. brown boots with a brown overshirt) to construct balanced vertical silhouettes.</p>
+                              <div className="space-y-1.5 text-[10px] text-[var(--text-secondary)] leading-relaxed font-bold">
+                                <p className="text-[var(--accent-terracotta)] font-black">⚠️ Sandwich Color Contrast Unavailable</p>
+                                <p>You have no matching top-layer and footwear colors. Try registering shoes in the same color family as your jackets or shirts (e.g. brown boots with a brown overshirt).</p>
                               </div>
                             );
                           }
 
                           return (
-                            <div className="space-y-1.5 text-[10px] text-zinc-400 leading-relaxed font-medium">
-                              <p className="text-teal-400 font-bold">✓ Sandwich Formulas Unlocked</p>
-                              <p>You can create a balanced "sandwich" outfit by matching your <strong className="text-white capitalize">{uniqueMatches.slice(0, 2).join(' or ')}</strong> jackets/tops with matching footwear, layered over light/contrasting bottoms in the middle.</p>
+                            <div className="space-y-1.5 text-[10px] text-[var(--text-secondary)] leading-relaxed font-bold">
+                              <p className="text-[var(--accent-sage)] font-black">✓ Sandwich Formulas Unlocked</p>
+                              <p>You can create a balanced "sandwich" outfit by matching your <strong className="text-[var(--text-primary)] capitalize">{uniqueMatches.slice(0, 2).join(' or ')}</strong> jackets/tops with matching footwear.</p>
                             </div>
                           );
                         })()}
                       </div>
 
                       {/* Textural Contrast Analysis */}
-                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-indigo-400">Textural Clash Index</span>
+                      <div className="p-4 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-3">
+                        <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)]">Textural Clash Index</span>
                         {items.length === 0 ? (
-                          <span className="text-zinc-555 text-xs">No texture data.</span>
+                          <span className="text-[var(--text-secondary)] text-xs">No texture data.</span>
                         ) : (() => {
                           const fabrics = items.map(i => (i.fabric_type || '').toLowerCase());
                           
@@ -3120,16 +3237,16 @@ export default function Home() {
                           const pRough = Math.round((rough / total) * 100);
                           const pSmooth = Math.round((smooth / total) * 100);
 
-                          let textureAdvice = "Excellent textural mix! Try clashing heavy, structured textures (e.g. corduroy/denim bottoms) with lightweight smooth drapery (e.g. linen/cotton tops) to add styling depth.";
+                          let textureAdvice = "Excellent textural mix! Try clashing heavy, structured textures with lightweight smooth drapery to add styling depth.";
                           if (pRough > 80) {
                             textureAdvice = "Highly weighted towards rough/structured fabrics. Consider adding lightweight smooth layers (cotton/linen tops) to prevent outfits from looking too heavy.";
                           } else if (pSmooth > 80) {
-                            textureAdvice = "Highly weighted towards smooth summer drape. Consider adding a rough texture like a denim jacket or corduroy/wool pieces to introduce structural weight.";
+                            textureAdvice = "Highly weighted towards smooth summer drape. Consider adding a rough texture like a denim jacket or corduroy/wool pieces.";
                           }
 
                           return (
-                            <div className="space-y-2 text-[10px] text-zinc-400 font-medium">
-                              <div className="flex justify-between text-[9px] text-zinc-500 font-bold">
+                            <div className="space-y-2 text-[10px] text-[var(--text-secondary)] font-bold">
+                              <div className="flex justify-between text-[9px] text-[var(--text-secondary)] font-black">
                                 <span>Rough/Structured: {pRough}%</span>
                                 <span>Smooth/Drape: {pSmooth}%</span>
                               </div>
@@ -3140,10 +3257,10 @@ export default function Home() {
                       </div>
 
                       {/* Silhouette Volume Checker */}
-                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-amber-400">Silhouette Proportions</span>
+                      <div className="p-4 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-3">
+                        <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)]">Silhouette Proportions</span>
                         {items.length === 0 ? (
-                          <span className="text-zinc-555 text-xs">Awaiting fit blocks.</span>
+                          <span className="text-[var(--text-secondary)] text-xs">Awaiting fit blocks.</span>
                         ) : (() => {
                           const fits = items.map(i => (i.fit_block || '').toLowerCase());
                           
@@ -3156,8 +3273,8 @@ export default function Home() {
                           }
 
                           return (
-                            <div className="space-y-2 text-[10px] text-zinc-400 font-medium">
-                              <div className="flex justify-between text-[9px] text-zinc-500 font-bold">
+                            <div className="space-y-2 text-[10px] text-[var(--text-secondary)] font-bold">
+                              <div className="flex justify-between text-[9px] text-[var(--text-secondary)] font-black">
                                 <span>Relaxed Fits: {relaxed}</span>
                                 <span>Fitted/Tailored: {fitted}</span>
                               </div>
@@ -3171,27 +3288,27 @@ export default function Home() {
                   </div>
 
                   {/* Purging Ledger */}
-                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
-                    <h3 className="text-sm font-bold text-white">🗑️ Wardrobe Culling Suggestions (To Par Down)</h3>
-                    <p className="text-zinc-400 text-xs">
+                  <div className="border border-[#EAE5D9] bg-white rounded-3xl p-5 space-y-4 tactile-shadow-sm">
+                    <h3 className="text-sm font-extrabold text-[var(--text-primary)]">🗑️ Wardrobe Culling Suggestions (To Par Down)</h3>
+                    <p className="text-[var(--text-secondary)] text-xs font-semibold">
                       The easiest way to par down is culling clothes with zero logged wears or those explicitly marked for archive/donation.
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Zero wears */}
-                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-amber-400">0 Wears Logged (Inactive Weight)</span>
+                      <div className="p-4 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-3">
+                        <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)]">0 Wears Logged (Inactive Weight)</span>
                         <div className="space-y-2 max-h-[25vh] overflow-y-auto">
                           {items.filter(i => getItemWornCount(i.id) === 0).length === 0 ? (
-                            <p className="text-[11px] text-zinc-550">Great job! You have worn every item in your closet at least once.</p>
+                            <p className="text-[11px] text-[var(--text-secondary)] font-bold">Great job! You have worn every item in your closet at least once.</p>
                           ) : (
                             items.filter(i => getItemWornCount(i.id) === 0).map(i => (
-                              <div key={i.id} className="flex justify-between items-center bg-zinc-950/40 p-2 rounded border border-zinc-855 text-xs text-zinc-350 font-medium">
+                              <div key={i.id} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-[#EAE5D9] text-xs text-[var(--text-primary)] font-bold">
                                 <span className="truncate">{i.brand || 'Unbranded'} {i.sub_category}</span>
                                 <button
                                   type="button"
                                   onClick={() => setEditingItem(i)}
-                                  className="text-[10px] font-bold text-teal-400 underline shrink-0"
+                                  className="text-[10px] font-black text-[var(--accent-terracotta)] underline shrink-0"
                                 >
                                   Cull
                                 </button>
@@ -3202,19 +3319,19 @@ export default function Home() {
                       </div>
 
                       {/* Explicitly flagged for discard/donate */}
-                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-rose-400">Flagged to Donate/Discard</span>
+                      <div className="p-4 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-3">
+                        <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)]">Flagged to Donate/Discard</span>
                         <div className="space-y-2 max-h-[25vh] overflow-y-auto">
                           {items.filter(i => i.status === 'Donate' || i.status === 'Discard').length === 0 ? (
-                            <p className="text-[11px] text-zinc-550">No items are currently marked for donation or discard.</p>
+                            <p className="text-[11px] text-[var(--text-secondary)] font-bold">No items are currently marked for donation or discard.</p>
                           ) : (
                             items.filter(i => i.status === 'Donate' || i.status === 'Discard').map(i => (
-                              <div key={i.id} className="flex justify-between items-center bg-zinc-950/40 p-2 rounded border border-zinc-855 text-xs text-zinc-350 font-medium">
+                              <div key={i.id} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-[#EAE5D9] text-xs text-[var(--text-primary)] font-bold">
                                 <span className="truncate">{i.brand || 'Unbranded'} {i.sub_category} ({i.status})</span>
                                 <button
                                   type="button"
                                   onClick={() => setEditingItem(i)}
-                                  className="text-[10px] font-bold text-teal-400 underline shrink-0"
+                                  className="text-[10px] font-black text-[var(--accent-terracotta)] underline shrink-0"
                                 >
                                   Manage
                                 </button>
@@ -3228,50 +3345,51 @@ export default function Home() {
                 </div>
               )}
 
+              {/* Style Guide sub-tab */}
               {closetSubTab === 'guide' && (
-                <div className="space-y-6 animate-fade-in">
-                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
-                    <h3 className="text-sm font-bold text-white">📖 Wardrobe Curation & Styling Guide</h3>
-                    <p className="text-zinc-400 text-xs">
+                <div className="space-y-6 animate-fade-in text-[var(--text-primary)]">
+                  <div className="border border-[#EAE5D9] bg-white rounded-3xl p-6 shadow-xl shadow-stone-200/40">
+                    <h3 className="text-base font-extrabold text-[var(--text-primary)] mb-1">📖 Wardrobe Curation & Styling Guide</h3>
+                    <p className="text-[var(--text-secondary)] text-xs mb-6">
                       A reference dictionary of key styling concepts used by the system to evaluate your closet coordination.
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       
                       {/* Rule 1: The Sandwich Rule */}
-                      <div className="p-5 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
-                        <span className="text-[10px] uppercase font-bold text-teal-400 font-black">01. The Sandwich Rule</span>
-                        <h4 className="font-bold text-white text-xs">Creating Vertical Symmetry</h4>
-                        <p className="text-zinc-400 text-xs leading-relaxed font-medium">
+                      <div className="p-5 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-[var(--accent-terracotta)] font-black">01. The Sandwich Rule</span>
+                        <h4 className="font-extrabold text-[var(--text-primary)] text-xs">Creating Vertical Symmetry</h4>
+                        <p className="text-[var(--text-secondary)] text-xs leading-relaxed font-bold">
                           This rule coordinates your outfit by matching the color family or visual weight of your top layer (shirt, sweater, jacket) with your footwear, while wearing a contrasting color or value in the middle (trousers). 
                         </p>
-                        <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-850 text-[10px] text-zinc-350 space-y-1 font-medium">
+                        <div className="bg-white p-3.5 rounded-xl border border-[#EAE5D9] text-[10px] text-[var(--text-primary)] space-y-1 font-bold">
                           <p>💡 <strong>Example:</strong> Brown leather jacket + Off-white chinos + Brown leather boots.</p>
                           <p>🎨 <strong>Why it works:</strong> It creates visual balance by anchoring the top and bottom of the silhouette, making the outfit look structured and deliberate.</p>
                         </div>
                       </div>
 
                       {/* Rule 2: Textural Contrast */}
-                      <div className="p-5 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
-                        <span className="text-[10px] uppercase font-bold text-indigo-400 font-black">02. Textural Contrast</span>
-                        <h4 className="font-bold text-white text-xs">Adding Depth Without Color</h4>
-                        <p className="text-zinc-400 text-xs leading-relaxed font-medium">
+                      <div className="p-5 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-[var(--accent-sage)] font-black">02. Textural Contrast</span>
+                        <h4 className="font-extrabold text-[var(--text-primary)] text-xs">Adding Depth Without Color</h4>
+                        <p className="text-[var(--text-secondary)] text-xs leading-relaxed font-bold">
                           Pairing items of similar colors works beautifully if you clash textures. Avoid pairing smooth cotton tops with smooth flat trousers. Instead, contrast rough/structured fabrics against light/drape fabrics.
                         </p>
-                        <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-850 text-[10px] text-zinc-350 space-y-1 font-medium">
+                        <div className="bg-white p-3.5 rounded-xl border border-[#EAE5D9] text-[10px] text-[var(--text-primary)] space-y-1 font-bold">
                           <p>💡 <strong>Example:</strong> A chunky wool cardigan or rugged denim jacket layered over a smooth silk or fine cotton tee.</p>
                           <p>🎨 <strong>Why it works:</strong> Texture absorbs and reflects light differently, generating visual interest and preventing monochrome outfits from looking flat.</p>
                         </div>
                       </div>
 
                       {/* Rule 3: Silhouette Proportions */}
-                      <div className="p-5 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
-                        <span className="text-[10px] uppercase font-bold text-amber-400 font-black">03. Fit & Silhouette Proportions</span>
-                        <h4 className="font-bold text-white text-xs">Volume Contrast (A-Line & Inverted Triangle)</h4>
-                        <p className="text-zinc-400 text-xs leading-relaxed font-medium">
+                      <div className="p-5 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-[var(--accent-apricot)] font-black">03. Fit & Silhouette Proportions</span>
+                        <h4 className="font-extrabold text-[var(--text-primary)] text-xs">Volume Contrast (A-Line & Inverted Triangle)</h4>
+                        <p className="text-[var(--text-secondary)] text-xs leading-relaxed font-bold">
                           Coordination relies heavily on balancing fit volumes. Try clashing a wide/relaxed garment with a slim/fitted one. Avoid wearing all-tight or all-loose clothing unless executing a specific silhouette layout.
                         </p>
-                        <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-850 text-[10px] text-zinc-350 space-y-1 font-medium">
+                        <div className="bg-white p-3.5 rounded-xl border border-[#EAE5D9] text-[10px] text-[var(--text-primary)] space-y-1 font-bold">
                           <p>💡 <strong>A-Line Formula:</strong> Fitted knit top tucked into relaxed-fit pleated trousers.</p>
                           <p>💡 <strong>Inverted Triangle:</strong> Oversized boxy hoodie/jacket over slim-fit raw denim.</p>
                           <p>🎨 <strong>Why it works:</strong> It creates dynamic proportions and draws focus to your natural structure rather than draping shape-lessly.</p>
@@ -3279,13 +3397,13 @@ export default function Home() {
                       </div>
 
                       {/* Rule 4: Tonal Contrast */}
-                      <div className="p-5 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
-                        <span className="text-[10px] uppercase font-bold text-emerald-400 font-black">04. Tonal Contrast Value</span>
-                        <h4 className="font-bold text-white text-xs">Matching Light, Medium & Dark Levels</h4>
-                        <p className="text-zinc-400 text-xs leading-relaxed font-medium">
+                      <div className="p-5 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-[var(--accent-sage)] font-black">04. Tonal Contrast Value</span>
+                        <h4 className="font-extrabold text-[var(--text-primary)] text-xs">Matching Light, Medium & Dark Levels</h4>
+                        <p className="text-[var(--text-secondary)] text-xs leading-relaxed font-bold">
                           Your wardrobe needs a healthy spread of tonal values. High-contrast outfits separate top and bottom cleanly. Low-contrast tonal outfits create a continuous vertical line, lengthening your look.
                         </p>
-                        <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-850 text-[10px] text-zinc-350 space-y-1 font-medium">
+                        <div className="bg-white p-3.5 rounded-xl border border-[#EAE5D9] text-[10px] text-[var(--text-primary)] space-y-1 font-bold">
                           <p>💡 <strong>High Contrast:</strong> Crisp white linen shirt paired with dark charcoal trousers.</p>
                           <p>💡 <strong>Low Tonal:</strong> Slate grey tee paired with light grey flannel trousers.</p>
                           <p>🎨 <strong>Why it works:</strong> Tonal spacing dictates the mood (formal/academic vs. relaxed/casual) and balances vertical highlights.</p>
@@ -3387,10 +3505,9 @@ export default function Home() {
                   </div>
                 </form>
               </div>
-
-              {/* RESULT */}
+                             {/* RESULT */}
               {stylistResult && (
-                <div className="space-y-6">
+                <div className="space-y-6 text-[var(--text-primary)]">
                   {/* Desktop Layout (Hidden on mobile) */}
                   <div className="hidden md:block space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -3400,29 +3517,29 @@ export default function Home() {
                           .filter((item): item is Garment => !!item);
 
                         return (
-                          <div key={idx} className="border border-zinc-850 bg-[#1f2833]/10 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                          <div key={idx} className="border border-[#EAE5D9] bg-white rounded-3xl p-5 flex flex-col justify-between space-y-4 shadow-xl shadow-stone-200/30">
                             <div>
-                              <div className="flex justify-between items-center mb-3">
-                                <span className="text-[9px] uppercase font-extrabold tracking-wider bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded">Option {idx + 1}</span>
+                              <div className="flex justify-between items-center mb-3 border-b border-[#F5F2EA] pb-2">
+                                <span className="text-[9px] uppercase font-black tracking-wider bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/20 px-2 py-0.5 rounded-full">Option {idx + 1}</span>
                                 <button
                                   onClick={() => saveStylistOutfit(outfit.name, outfit.item_ids, outfit.styling_reasoning)}
                                   disabled={savingOutfitIds.includes(outfit.name)}
-                                  className="text-xs text-teal-400 hover:text-teal-300 font-bold"
+                                  className="text-xs text-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]/80 font-black"
                                 >
                                   {savingOutfitIds.includes(outfit.name) ? 'Saving...' : '💾 Save Outfit'}
                                 </button>
                               </div>
-                              <h3 className="text-sm font-bold text-white mb-3">{outfit.name}</h3>
+                              <h3 className="text-sm font-extrabold text-[var(--text-primary)] mb-3">{outfit.name}</h3>
 
                               <div className="grid grid-cols-3 gap-2 mb-3">
                                 {outfitItems.map(oi => (
-                                  <div key={oi.id} className="border border-zinc-800 bg-black rounded-lg overflow-hidden">
-                                    <img src={oi.primary_image_url || ''} alt="" className="object-cover w-full aspect-square" />
+                                  <div key={oi.id} className="border border-[#EAE5D9] bg-[#FBFBFA] rounded-2xl overflow-hidden aspect-square flex items-center justify-center p-1.5 shadow-sm">
+                                    <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
                                   </div>
                                 ))}
                               </div>
 
-                              <p className="text-xs text-zinc-400 leading-relaxed mb-3">{outfit.styling_reasoning}</p>
+                              <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-3 font-semibold">{outfit.styling_reasoning}</p>
                               
                               <button
                                 type="button"
@@ -3431,7 +3548,7 @@ export default function Home() {
                                   items: outfitItems,
                                   tab: 'collage'
                                 })}
-                                className="w-full py-2 bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                                className="w-full py-2.5 bg-[#FAF8F5] text-[var(--accent-terracotta)] border border-[#EAE5D9] hover:bg-[#F5F2EB] rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5"
                               >
                                 🎨 View Outfit Visuals
                               </button>
@@ -3442,14 +3559,14 @@ export default function Home() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="md:col-span-2 border border-amber-500/15 bg-amber-500/5 rounded-2xl p-5">
-                        <h4 className="text-xs font-bold text-amber-400 mb-2">⚠️ Lookbook Wardrobe Gaps</h4>
-                        <p className="text-xs text-zinc-300 leading-relaxed">{stylistResult.gap_analysis}</p>
+                      <div className="md:col-span-2 border border-[var(--accent-terracotta)]/25 bg-[var(--accent-terracotta)]/5 rounded-3xl p-5">
+                        <h4 className="text-xs font-black text-[var(--accent-terracotta)] mb-2">⚠️ Lookbook Wardrobe Gaps</h4>
+                        <p className="text-xs text-[var(--text-primary)] leading-relaxed font-semibold">{stylistResult.gap_analysis}</p>
                       </div>
 
-                      <div className="border border-zinc-850 bg-[#1f2833]/15 rounded-2xl p-5 text-xs">
-                        <h4 className="text-xs font-bold text-teal-400 mb-2">Styling Tips</h4>
-                        <ul className="space-y-1 list-disc pl-4 text-zinc-400">
+                      <div className="border border-[#EAE5D9] bg-white rounded-3xl p-5 text-xs shadow-sm">
+                        <h4 className="text-xs font-black text-[var(--accent-terracotta)] mb-2">Styling Tips</h4>
+                        <ul className="space-y-1 list-disc pl-4 text-[var(--text-secondary)] font-semibold">
                           {stylistResult.general_tips.map((t, i) => <li key={i}>{t}</li>)}
                         </ul>
                       </div>
@@ -3469,18 +3586,18 @@ export default function Home() {
                           <div className="relative min-h-[50vh] flex flex-col justify-between">
                             {/* Visual swipe glows */}
                             <div 
-                              className="absolute inset-0 pointer-events-none transition-opacity duration-200 z-0"
+                              className="absolute inset-0 pointer-events-none transition-opacity duration-200 z-0 animate-fade-in"
                               style={{
-                                background: 'radial-gradient(circle at center, rgba(16, 185, 129, 0.1) 0%, transparent 70%)',
+                                background: 'radial-gradient(circle at center, rgba(143, 168, 155, 0.15) 0%, transparent 70%)',
                                 opacity: isSwipingStylist && touchCurrentStylist !== null && touchStartStylist !== null && (touchCurrentStylist - touchStartStylist) > 0
                                   ? Math.min((touchCurrentStylist - touchStartStylist) / 150, 1)
                                   : 0
                               }}
                             />
                             <div 
-                              className="absolute inset-0 pointer-events-none transition-opacity duration-200 z-0"
+                              className="absolute inset-0 pointer-events-none transition-opacity duration-200 z-0 animate-fade-in"
                               style={{
-                                background: 'radial-gradient(circle at center, rgba(239, 68, 68, 0.1) 0%, transparent 70%)',
+                                background: 'radial-gradient(circle at center, rgba(200, 107, 85, 0.15) 0%, transparent 70%)',
                                 opacity: isSwipingStylist && touchCurrentStylist !== null && touchStartStylist !== null && (touchCurrentStylist - touchStartStylist) < 0
                                   ? Math.min(Math.abs(touchCurrentStylist - touchStartStylist) / 150, 1)
                                   : 0
@@ -3513,7 +3630,7 @@ export default function Home() {
                                 setTouchCurrentStylist(null);
                                 setIsSwipingStylist(false);
                               }}
-                              className="w-full bg-[#1f2833]/15 border border-zinc-800 rounded-3xl p-5 shadow-2xl relative z-10 transition-transform flex flex-col justify-between space-y-4"
+                              className="w-full bg-white border border-[#EAE5D9] rounded-3xl p-5 shadow-2xl relative z-10 transition-transform flex flex-col justify-between space-y-4"
                               style={{
                                 transform: isSwipingStylist && touchCurrentStylist !== null && touchStartStylist !== null
                                   ? `translateX(${touchCurrentStylist - touchStartStylist}px) rotate(${(touchCurrentStylist - touchStartStylist) * 0.05}deg)`
@@ -3523,29 +3640,29 @@ export default function Home() {
                             >
                               <div>
                                 <div className="flex justify-between items-center mb-3">
-                                  <span className="text-[8px] uppercase font-black tracking-wider bg-teal-400 text-zinc-950 px-2 py-0.5 rounded-full">
+                                  <span className="text-[8px] uppercase font-black tracking-wider bg-[var(--accent-terracotta)] text-white px-2.5 py-0.5 rounded-full">
                                     Option {currentOutfitIdx + 1} of {stylistResult.outfits.length}
                                   </span>
-                                  <span className="text-[9px] text-zinc-500 uppercase font-bold animate-pulse">
+                                  <span className="text-[9px] text-[var(--text-secondary)] uppercase font-bold animate-pulse">
                                     ← Swipe to Pass • Save to Swipe →
                                   </span>
                                 </div>
-                                <h3 className="text-base font-black text-white">{outfit.name}</h3>
+                                <h3 className="text-base font-extrabold text-[var(--text-primary)]">{outfit.name}</h3>
                               </div>
 
                               {/* Constituents grid (Large polaroid thumbs) */}
                               <div className="grid grid-cols-3 gap-2">
                                 {outfitItems.map(oi => (
-                                  <div key={oi.id} className="border border-zinc-800 bg-black rounded-2xl overflow-hidden aspect-square flex items-center justify-center p-1.5 shadow-md relative">
-                                    <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-lighten" />
-                                    <span className="absolute bottom-1 inset-x-1 bg-zinc-900/80 text-[7px] font-bold text-center text-zinc-400 py-0.5 rounded-md truncate">
+                                  <div key={oi.id} className="border border-[#EAE5D9] bg-[#FBFBFA] rounded-2xl overflow-hidden aspect-square flex items-center justify-center p-1.5 shadow-sm relative">
+                                    <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
+                                    <span className="absolute bottom-1 inset-x-1 bg-white/95 border border-[#EAE5D9] text-[7px] font-black text-center text-[var(--text-secondary)] py-0.5 rounded-lg truncate">
                                       {oi.sub_category}
                                     </span>
                                   </div>
                                 ))}
                               </div>
 
-                              <p className="text-xs text-zinc-400 leading-relaxed bg-zinc-950/40 p-3.5 border border-zinc-850 rounded-2xl">
+                              <p className="text-xs text-[var(--text-secondary)] leading-relaxed bg-[#FAF8F5] p-3.5 border border-[#EAE5D9] rounded-2xl font-bold">
                                 {outfit.styling_reasoning}
                               </p>
 
@@ -3554,7 +3671,7 @@ export default function Home() {
                                 <button
                                   type="button"
                                   onClick={() => setCurrentOutfitIdx(prev => prev + 1)}
-                                  className="w-1/3 py-3 text-xs font-bold bg-zinc-900 text-zinc-500 border border-zinc-850 rounded-xl active:scale-95 transition"
+                                  className="w-1/3 py-3 text-xs font-black bg-[#F5F2EB] text-stone-600 border border-[#EAE5D9] rounded-xl active:scale-95 transition"
                                 >
                                   Pass
                                 </button>
@@ -3565,7 +3682,7 @@ export default function Home() {
                                     setCurrentOutfitIdx(prev => prev + 1);
                                   }}
                                   disabled={savingOutfitIds.includes(outfit.name)}
-                                  className="w-2/3 py-3 text-xs font-black bg-teal-400 text-zinc-950 rounded-xl active:scale-95 transition shadow-lg"
+                                  className="w-2/3 py-3 text-xs font-black bg-[var(--accent-terracotta)] text-white rounded-xl active:scale-95 transition shadow-md"
                                 >
                                   {savingOutfitIds.includes(outfit.name) ? 'Saving...' : '💾 Save Outfit'}
                                 </button>
@@ -3576,14 +3693,14 @@ export default function Home() {
                       })()
                     ) : (
                       <div className="space-y-4 animate-fade-in">
-                        <div className="border border-amber-500/15 bg-amber-500/5 rounded-2xl p-5">
-                          <h4 className="text-xs font-bold text-amber-400 mb-2">⚠️ Lookbook Wardrobe Gaps</h4>
-                          <p className="text-xs text-zinc-300 leading-relaxed">{stylistResult.gap_analysis}</p>
+                        <div className="border border-[var(--accent-terracotta)]/25 bg-[var(--accent-terracotta)]/5 rounded-3xl p-5">
+                          <h4 className="text-xs font-extrabold text-[var(--accent-terracotta)] mb-2">⚠️ Lookbook Wardrobe Gaps</h4>
+                          <p className="text-xs text-[var(--text-primary)] leading-relaxed font-bold">{stylistResult.gap_analysis}</p>
                         </div>
 
-                        <div className="border border-zinc-850 bg-[#1f2833]/15 rounded-2xl p-5 text-xs">
-                          <h4 className="text-xs font-bold text-teal-400 mb-2">Styling Tips</h4>
-                          <ul className="space-y-2 list-disc pl-4 text-zinc-400">
+                        <div className="border border-[#EAE5D9] bg-white rounded-3xl p-5 text-xs shadow-sm">
+                          <h4 className="text-xs font-extrabold text-[var(--accent-terracotta)] mb-2">Styling Tips</h4>
+                          <ul className="space-y-2 list-disc pl-4 text-[var(--text-secondary)] font-bold">
                             {stylistResult.general_tips.map((t, i) => <li key={i}>{t}</li>)}
                           </ul>
                         </div>
@@ -3591,7 +3708,7 @@ export default function Home() {
                         <button
                           type="button"
                           onClick={() => setCurrentOutfitIdx(0)}
-                          className="w-full py-3.5 text-xs font-bold bg-zinc-900 text-white rounded-xl border border-zinc-800"
+                          className="w-full py-3.5 text-xs font-extrabold bg-white text-[var(--text-primary)] rounded-2xl border border-[#EAE5D9] shadow-sm active:scale-98 transition"
                         >
                           🔄 Review Swiped Outfits
                         </button>
@@ -3605,51 +3722,83 @@ export default function Home() {
 
           {/* TAB 4: METRICS (First-class View) */}
           {activeTab === 'metrics' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-6 backdrop-blur-sm">
-                <h2 className="text-base font-bold text-white mb-2">📊 System Telemetry & Cost Ledger</h2>
-                <p className="text-zinc-400 text-xs mb-6">
+            <div className="space-y-6 animate-fade-in text-[var(--text-primary)]">
+              <div className="border border-[#EAE5D9] bg-white rounded-3xl p-6 shadow-xl shadow-stone-200/40">
+                <h2 className="text-base font-extrabold text-[var(--text-primary)] mb-2">📊 System Telemetry & Cost Ledger</h2>
+                <p className="text-[var(--text-secondary)] text-xs mb-6 font-semibold">
                   Detailed real-time accounting of Gemini API consumption, token usage, and latency.
                 </p>
 
                 {telemetry ? (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl">
-                        <span className="text-[10px] uppercase font-bold text-zinc-550">Cumulative Cost</span>
-                        <p className="text-2xl font-black text-emerald-400 font-mono mt-1">${telemetry.totalCost}</p>
+                      <div className="p-4 bg-[#FAF8F5] border border-[#EAE5D9] rounded-2xl">
+                        <span className="text-[10px] uppercase font-bold text-stone-500">Cumulative Cost</span>
+                        <p className="text-2xl font-black text-[var(--accent-terracotta)] font-mono mt-1">${telemetry.totalCost}</p>
                       </div>
-                      <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl">
-                        <span className="text-[10px] uppercase font-bold text-zinc-550">Prompt Tokens (In)</span>
-                        <p className="text-2xl font-black text-white font-mono mt-1">{telemetry.totalTokensIn.toLocaleString()}</p>
+                      <div className="p-4 bg-[#FAF8F5] border border-[#EAE5D9] rounded-2xl">
+                        <span className="text-[10px] uppercase font-bold text-stone-500">Prompt Tokens (In)</span>
+                        <p className="text-2xl font-black text-[var(--text-primary)] font-mono mt-1">{telemetry.totalTokensIn.toLocaleString()}</p>
                       </div>
-                      <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl">
-                        <span className="text-[10px] uppercase font-bold text-zinc-550">Candidates Tokens (Out)</span>
-                        <p className="text-2xl font-black text-white font-mono mt-1">{telemetry.totalTokensOut.toLocaleString()}</p>
+                      <div className="p-4 bg-[#FAF8F5] border border-[#EAE5D9] rounded-2xl">
+                        <span className="text-[10px] uppercase font-bold text-stone-500">Candidates Tokens (Out)</span>
+                        <p className="text-2xl font-black text-[var(--text-primary)] font-mono mt-1">{telemetry.totalTokensOut.toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    {/* Cost Accounting Bar Chart */}
+                    <div className="p-5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-3xl space-y-4">
+                      <h4 className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider">Estimated Cost Breakdown by Service</h4>
+                      <div className="space-y-3">
+                        {(() => {
+                          const serviceCosts = telemetryLogs.reduce((acc: Record<string, number>, log) => {
+                            const cost = Number(log.estimated_cost) || 0;
+                            acc[log.service] = (acc[log.service] || 0) + cost;
+                            return acc;
+                          }, {});
+                          const maxCost = Math.max(...Object.values(serviceCosts), 0.001);
+                          return Object.entries(serviceCosts).map(([service, cost]) => {
+                            const percent = Math.min((cost / maxCost) * 100, 100);
+                            return (
+                              <div key={service} className="space-y-1">
+                                <div className="flex justify-between text-[10px] font-bold">
+                                  <span className="text-[var(--text-primary)]">{service}</span>
+                                  <span className="text-[var(--accent-terracotta)] font-mono">${cost.toFixed(6)}</span>
+                                </div>
+                                <div className="w-full bg-stone-200/60 rounded-full h-3 overflow-hidden shadow-inner">
+                                  <div 
+                                    className="bg-[var(--accent-terracotta)] h-3 rounded-full transition-all duration-500" 
+                                    style={{ width: `${percent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      <h4 className="text-xs font-bold text-zinc-400">Transactions Log</h4>
-                      <div className="border border-zinc-855 bg-zinc-950/20 rounded-xl overflow-hidden overflow-x-auto text-[10px] font-mono">
+                      <h4 className="text-xs font-black text-[var(--text-secondary)]">Transactions Log</h4>
+                      <div className="border border-[#EAE5D9] bg-[#FAF8F5] rounded-2xl overflow-hidden overflow-x-auto text-[10px] font-mono shadow-inner">
                         <table className="w-full text-left">
                           <thead>
-                            <tr className="border-b border-zinc-850 bg-zinc-900/60 text-zinc-400">
-                              <th className="p-2.5">Time</th>
-                              <th className="p-2.5">Service</th>
-                              <th className="p-2.5">In/Out Tokens</th>
-                              <th className="p-2.5">Est. Cost</th>
-                              <th className="p-2.5">Latency</th>
+                            <tr className="border-b border-[#EAE5D9] bg-[#F5F2EB] text-[var(--text-secondary)]">
+                              <th className="p-2.5 font-black">Time</th>
+                              <th className="p-2.5 font-black">Service</th>
+                              <th className="p-2.5 font-black">In/Out Tokens</th>
+                              <th className="p-2.5 font-black">Est. Cost</th>
+                              <th className="p-2.5 font-black">Latency</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-zinc-850">
+                          <tbody className="divide-y divide-[#EAE5D9]">
                             {telemetryLogs.map((log) => (
-                              <tr key={log.id} className="text-zinc-300">
-                                <td className="p-2.5">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                                <td className="p-2.5 text-teal-400 font-bold">{log.service}</td>
-                                <td className="p-2.5">{log.tokens_in} / {log.tokens_out}</td>
-                                <td className="p-2.5 text-emerald-400 font-bold">${log.estimated_cost}</td>
-                                <td className="p-2.5">{log.latency_ms || 120}ms</td>
+                              <tr key={log.id} className="text-[var(--text-primary)] hover:bg-white/40 transition">
+                                <td className="p-2.5 font-bold">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                                <td className="p-2.5 text-[var(--accent-terracotta)] font-extrabold">{log.service}</td>
+                                <td className="p-2.5 font-bold">{log.tokens_in} / {log.tokens_out}</td>
+                                <td className="p-2.5 text-stone-700 font-extrabold">${log.estimated_cost}</td>
+                                <td className="p-2.5 font-bold">{log.latency_ms || 120}ms</td>
                               </tr>
                             ))}
                           </tbody>
@@ -3658,7 +3807,7 @@ export default function Home() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-500">Loading telemetry data...</p>
+                  <p className="text-xs text-stone-400">Loading telemetry data...</p>
                 )}
               </div>
             </div>
@@ -3666,57 +3815,89 @@ export default function Home() {
 
         </section>
 
-        <footer className="mt-16 border-t border-zinc-850 pt-8 pb-12 text-center text-[10px] text-zinc-500">
+        <footer className="mt-16 border-t border-[#EAE5D9] pt-8 pb-12 text-center text-[10px] text-[var(--text-secondary)] font-bold">
           <p>© 2026 Antigravity Threads • v2.31.0 Release</p>
         </footer>
       </main>
 
       {/* TELEMETRY DRAWER */}
       {showTelemetry && telemetry && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#1f2833] border-t border-zinc-800 shadow-2xl p-6 max-h-[45vh] overflow-y-auto animate-slide-up">
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#EAE5D9] shadow-2xl p-6 max-h-[45vh] overflow-y-auto animate-slide-up text-[var(--text-primary)]">
+          <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3 mb-4">
+            <h3 className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-2">
               📊 System Telemetry & Cost Accounting Ledger
             </h3>
-            <button onClick={() => setShowTelemetry(false)} className="text-zinc-400 hover:text-white">✕</button>
+            <button onClick={() => setShowTelemetry(false)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold">✕</button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl">
-              <span className="text-[10px] uppercase font-bold text-zinc-500">Cumulative API Cost</span>
-              <p className="text-2xl font-black text-emerald-400 font-mono mt-1">${telemetry.totalCost}</p>
+            <div className="p-4 bg-[#FAF8F5] border border-[#EAE5D9] rounded-2xl">
+              <span className="text-[10px] uppercase font-bold text-stone-500">Cumulative API Cost</span>
+              <p className="text-2xl font-black text-[var(--accent-terracotta)] font-mono mt-1">${telemetry.totalCost}</p>
             </div>
-            <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl">
-              <span className="text-[10px] uppercase font-bold text-zinc-500">Prompt Tokens (In)</span>
-              <p className="text-2xl font-black text-white font-mono mt-1">{telemetry.totalTokensIn.toLocaleString()}</p>
+            <div className="p-4 bg-[#FAF8F5] border border-[#EAE5D9] rounded-2xl">
+              <span className="text-[10px] uppercase font-bold text-stone-500">Prompt Tokens (In)</span>
+              <p className="text-2xl font-black text-[var(--text-primary)] font-mono mt-1">{telemetry.totalTokensIn.toLocaleString()}</p>
             </div>
-            <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl">
-              <span className="text-[10px] uppercase font-bold text-zinc-500">Candidates Tokens (Out)</span>
-              <p className="text-2xl font-black text-white font-mono mt-1">{telemetry.totalTokensOut.toLocaleString()}</p>
+            <div className="p-4 bg-[#FAF8F5] border border-[#EAE5D9] rounded-2xl">
+              <span className="text-[10px] uppercase font-bold text-stone-500">Candidates Tokens (Out)</span>
+              <p className="text-2xl font-black text-[var(--text-primary)] font-mono mt-1">{telemetry.totalTokensOut.toLocaleString()}</p>
+            </div>
+          </div>
+
+          {/* Cost Accounting Bar Chart */}
+          <div className="p-5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-3xl space-y-4 mb-6">
+            <h4 className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider">Estimated Cost Breakdown by Service</h4>
+            <div className="space-y-3">
+              {(() => {
+                const serviceCosts = telemetryLogs.reduce((acc: Record<string, number>, log) => {
+                  const cost = Number(log.estimated_cost) || 0;
+                  acc[log.service] = (acc[log.service] || 0) + cost;
+                  return acc;
+                }, {});
+                const maxCost = Math.max(...Object.values(serviceCosts), 0.001);
+                return Object.entries(serviceCosts).map(([service, cost]) => {
+                  const percent = Math.min((cost / maxCost) * 100, 100);
+                  return (
+                    <div key={service} className="space-y-1">
+                      <div className="flex justify-between text-[10px] font-bold">
+                        <span className="text-[var(--text-primary)]">{service}</span>
+                        <span className="text-[var(--accent-terracotta)] font-mono">${cost.toFixed(6)}</span>
+                      </div>
+                      <div className="w-full bg-stone-200/60 rounded-full h-3 overflow-hidden shadow-inner">
+                        <div 
+                          className="bg-[var(--accent-terracotta)] h-3 rounded-full transition-all duration-500" 
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-xs font-bold text-zinc-400">Transactions Ledger (Latency & Cost)</h4>
-            <div className="border border-zinc-855 bg-zinc-950/20 rounded-xl overflow-hidden overflow-x-auto text-[10px] font-mono">
+            <h4 className="text-xs font-black text-[var(--text-secondary)]">Transactions Ledger (Latency & Cost)</h4>
+            <div className="border border-[#EAE5D9] bg-[#FAF8F5] rounded-2xl overflow-hidden overflow-x-auto text-[10px] font-mono shadow-inner">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="border-b border-zinc-850 bg-zinc-900/60 text-zinc-400">
-                    <th className="p-2">Timestamp</th>
-                    <th className="p-2">Service</th>
-                    <th className="p-2">Tokens In/Out</th>
-                    <th className="p-2">Est. Cost</th>
-                    <th className="p-2">Latency</th>
+                  <tr className="border-b border-[#EAE5D9] bg-[#F5F2EB] text-[var(--text-secondary)]">
+                    <th className="p-2 font-black">Timestamp</th>
+                    <th className="p-2 font-black">Service</th>
+                    <th className="p-2 font-black">Tokens In/Out</th>
+                    <th className="p-2 font-black">Est. Cost</th>
+                    <th className="p-2 font-black">Latency</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-850">
+                <tbody className="divide-y divide-[#EAE5D9]">
                   {telemetryLogs.map((log) => (
-                    <tr key={log.id} className="text-zinc-300">
-                      <td className="p-2">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                      <td className="p-2 text-teal-400 font-bold">{log.service}</td>
-                      <td className="p-2">{log.tokens_in} / {log.tokens_out}</td>
-                      <td className="p-2 text-emerald-400 font-bold">${log.estimated_cost}</td>
-                      <td className="p-2">{log.latency_ms || 120}ms</td>
+                    <tr key={log.id} className="text-[var(--text-primary)] hover:bg-white/40 transition">
+                      <td className="p-2 font-bold">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                      <td className="p-2 text-[var(--accent-terracotta)] font-extrabold">{log.service}</td>
+                      <td className="p-2 font-bold">{log.tokens_in} / {log.tokens_out}</td>
+                      <td className="p-2 text-stone-700 font-extrabold">${log.estimated_cost}</td>
+                      <td className="p-2 font-bold">{log.latency_ms || 120}ms</td>
                     </tr>
                   ))}
                 </tbody>
@@ -3729,16 +3910,16 @@ export default function Home() {
       {/* CLIENT-SIDE CUTOUT PROGRESS OVERLAY */}
       {cutoutProgress && (
         <div className="fixed inset-0 z-55 flex flex-col items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="bg-[#1f2833] border border-teal-500/20 rounded-2xl p-8 max-w-sm w-full text-center space-y-6 shadow-2xl shadow-teal-500/5">
+          <div className="bg-white border border-[#EAE5D9] rounded-3xl p-8 max-w-sm w-full text-center space-y-6 shadow-2xl shadow-stone-300">
             <div className="relative w-16 h-16 mx-auto">
-              <div className="absolute inset-0 rounded-full border-4 border-zinc-800"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-teal-400 border-t-transparent animate-spin"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-[#FAF8F5]"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-[var(--accent-terracotta)] border-t-transparent animate-spin"></div>
             </div>
             <div className="space-y-2">
-              <h3 className="text-sm font-bold text-white tracking-wide uppercase">AI Cutout Processing</h3>
-              <p className="text-xs text-teal-400 font-medium animate-pulse">{cutoutProgress}</p>
+              <h3 className="text-sm font-extrabold text-[var(--text-primary)] tracking-wide uppercase">AI Cutout Processing</h3>
+              <p className="text-xs text-[var(--accent-terracotta)] font-extrabold animate-pulse">{cutoutProgress}</p>
             </div>
-            <p className="text-[10px] text-zinc-500 leading-normal">
+            <p className="text-[10px] text-[var(--text-secondary)] leading-normal font-bold">
               Running background removal client-side using Transformers.js. The first execution will download the model weights (approx. 40MB). Subsequent cutouts are instant.
             </p>
           </div>
@@ -3748,29 +3929,29 @@ export default function Home() {
       {/* OUTFIT VISUALS MODAL (COLLAGE / GENERATIVE / TRY-ON) */}
       {visualModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="bg-[#1f2833] border border-zinc-800 rounded-3xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl shadow-teal-500/5">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div className="bg-white border border-[#EAE5D9] rounded-3xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl shadow-stone-300 text-[var(--text-primary)]">
+            <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3">
               <div>
-                <h3 className="text-sm font-bold text-white">Outfit Visualizer</h3>
-                <p className="text-[10px] text-zinc-400 mt-0.5">{visualModal.outfitName}</p>
+                <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Outfit Visualizer</h3>
+                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 font-bold">{visualModal.outfitName}</p>
               </div>
               <button 
                 onClick={() => setVisualModal(null)} 
-                className="text-zinc-400 hover:text-white"
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-extrabold"
               >
                 ✕
               </button>
             </div>
 
             {/* Visual Tabs */}
-            <div className="flex border-b border-zinc-850">
+            <div className="flex border-b border-[#EAE5D9]">
               <button
                 type="button"
                 onClick={() => setVisualModal({ ...visualModal, tab: 'collage' })}
-                className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 ${
+                className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 uppercase tracking-wider ${
                   visualModal.tab === 'collage' 
-                    ? 'border-teal-400 text-teal-400' 
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    ? 'border-[var(--accent-terracotta)] text-[var(--accent-terracotta)] font-black' 
+                    : 'border-transparent text-stone-500 hover:text-stone-850'
                 }`}
               >
                 🖼️ Option A: Collage
@@ -3778,10 +3959,10 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => setVisualModal({ ...visualModal, tab: 'generative' })}
-                className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 ${
+                className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 uppercase tracking-wider ${
                   visualModal.tab === 'generative' 
-                    ? 'border-teal-400 text-teal-400' 
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    ? 'border-[var(--accent-terracotta)] text-[var(--accent-terracotta)] font-black' 
+                    : 'border-transparent text-stone-500 hover:text-stone-850'
                 }`}
               >
                 ✨ Option B: AI Flat-lay
@@ -3789,10 +3970,10 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => setVisualModal({ ...visualModal, tab: 'tryon' })}
-                className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 ${
+                className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 uppercase tracking-wider ${
                   visualModal.tab === 'tryon' 
-                    ? 'border-teal-400 text-teal-400' 
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    ? 'border-[var(--accent-terracotta)] text-[var(--accent-terracotta)] font-black' 
+                    : 'border-transparent text-stone-500 hover:text-stone-850'
                 }`}
               >
                 👤 AI Virtual Try-On
@@ -3811,9 +3992,9 @@ export default function Home() {
                     }}
                     width={600}
                     height={800}
-                    className="mx-auto max-h-[50vh] w-full object-contain border border-zinc-800 rounded-xl bg-zinc-950 shadow-inner"
+                    className="mx-auto max-h-[50vh] w-full object-contain border border-[#EAE5D9] rounded-2xl bg-[#FBFBFA] shadow-inner"
                   />
-                  <p className="text-[10px] text-zinc-500">
+                  <p className="text-[10px] text-[var(--text-secondary)] font-bold">
                     Stitched locally using garment cutout layers. Instant, free, and lightweight.
                   </p>
                 </div>
@@ -3822,28 +4003,28 @@ export default function Home() {
               {visualModal.tab === 'generative' && (
                 <div className="space-y-4 text-center">
                   {visualModal.loading ? (
-                    <div className="h-64 flex flex-col items-center justify-center space-y-3 bg-zinc-950/40 rounded-xl border border-zinc-850">
-                      <div className="w-8 h-8 rounded-full border-2 border-teal-400 border-t-transparent animate-spin"></div>
-                      <p className="text-xs text-teal-400 animate-pulse">{visualModal.loadingMsg || 'Generating...'}</p>
+                    <div className="h-64 flex flex-col items-center justify-center space-y-3 bg-[#FAF8F5] rounded-2xl border border-[#EAE5D9]">
+                      <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-terracotta)] border-t-transparent animate-spin"></div>
+                      <p className="text-xs text-[var(--accent-terracotta)] animate-pulse font-bold">{visualModal.loadingMsg || 'Generating...'}</p>
                     </div>
                   ) : visualModal.genUrl ? (
                     <div className="space-y-4">
                       <img 
                         src={visualModal.genUrl} 
                         alt="AI Generated Outfit" 
-                        className="mx-auto max-h-[50vh] object-contain border border-zinc-800 rounded-xl shadow-lg"
+                        className="mx-auto max-h-[50vh] object-contain border border-[#EAE5D9] rounded-2xl shadow-lg"
                       />
                       <button
                         type="button"
                         onClick={() => setVisualModal({ ...visualModal, genUrl: undefined })}
-                        className="px-4 py-1.5 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded-lg text-xs font-semibold"
+                        className="px-4 py-1.5 bg-[#FAF8F5] border border-[#EAE5D9] text-[var(--text-secondary)] hover:bg-[#F5F2EB] rounded-xl text-xs font-bold"
                       >
                         Regenerate
                       </button>
                     </div>
                   ) : (
-                    <div className="h-64 flex flex-col items-center justify-center space-y-4 bg-zinc-950/40 rounded-xl border border-zinc-850 p-6">
-                      <p className="text-xs text-zinc-400 max-w-sm leading-normal">
+                    <div className="h-64 flex flex-col items-center justify-center space-y-4 bg-[#FAF8F5] rounded-2xl border border-[#EAE5D9] p-6">
+                      <p className="text-xs text-[var(--text-secondary)] max-w-sm leading-normal font-bold">
                         Generate a professional editorial flat-lay photo of this outfit using Stable Diffusion XL via Hugging Face.
                       </p>
                       <button
@@ -3873,7 +4054,7 @@ export default function Home() {
                             setVisualModal({ ...visualModal, loading: false });
                           }
                         }}
-                        className="px-5 py-2 bg-teal-400 text-black hover:bg-teal-300 rounded-xl text-xs font-bold transition"
+                        className="px-5 py-2.5 bg-[var(--accent-terracotta)] text-white hover:bg-[var(--accent-terracotta)]/95 rounded-xl text-xs font-black shadow-md transition"
                       >
                         ✨ Generate AI Flat-lay
                       </button>
@@ -3885,21 +4066,21 @@ export default function Home() {
               {visualModal.tab === 'tryon' && (
                 <div className="space-y-4">
                   {visualModal.loading ? (
-                    <div className="h-64 flex flex-col items-center justify-center space-y-3 bg-zinc-950/40 rounded-xl border border-zinc-850">
-                      <div className="w-8 h-8 rounded-full border-2 border-teal-400 border-t-transparent animate-spin"></div>
-                      <p className="text-xs text-teal-400 animate-pulse">{visualModal.loadingMsg || 'Processing Virtual Try-On...'}</p>
+                    <div className="h-64 flex flex-col items-center justify-center space-y-3 bg-[#FAF8F5] rounded-2xl border border-[#EAE5D9]">
+                      <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-terracotta)] border-t-transparent animate-spin"></div>
+                      <p className="text-xs text-[var(--accent-terracotta)] animate-pulse font-bold">{visualModal.loadingMsg || 'Processing Virtual Try-On...'}</p>
                     </div>
                   ) : visualModal.genUrl ? (
                     <div className="text-center space-y-4">
                       <img 
                         src={visualModal.genUrl} 
                         alt="Try-On Result" 
-                        className="mx-auto max-h-[50vh] object-contain border border-zinc-800 rounded-xl shadow-lg"
+                        className="mx-auto max-h-[50vh] object-contain border border-[#EAE5D9] rounded-2xl shadow-lg"
                       />
                       <button
                         type="button"
                         onClick={() => setVisualModal({ ...visualModal, genUrl: undefined })}
-                        className="px-4 py-1.5 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded-lg text-xs font-semibold"
+                        className="px-4 py-1.5 bg-[#FAF8F5] border border-[#EAE5D9] text-[var(--text-secondary)] hover:bg-[#F5F2EB] rounded-xl text-xs font-bold"
                       >
                         Try Another Item
                       </button>
@@ -3907,14 +4088,14 @@ export default function Home() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Left side: Upload portrait */}
-                      <div className="border border-dashed border-zinc-800 bg-zinc-950/30 rounded-xl p-4 flex flex-col items-center justify-center text-center min-h-[250px]">
+                      <div className="border border-dashed border-[#EAE5D9] bg-[#FAF8F5] rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[250px]">
                         {visualModal.personImage ? (
-                          <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-black flex items-center justify-center">
-                            <img src={visualModal.personImage} alt="User Portrait" className="object-contain w-full h-full" />
+                          <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-white border border-[#EAE5D9] flex items-center justify-center">
+                            <img src={visualModal.personImage} alt="User Portrait" className="object-contain w-full h-full mix-blend-multiply" />
                             <button
                               type="button"
                               onClick={() => setVisualModal({ ...visualModal, personImage: null })}
-                              className="absolute top-2 right-2 bg-black/70 hover:bg-black p-1.5 rounded-full text-xs text-zinc-400 hover:text-white"
+                              className="absolute top-2 right-2 bg-white/90 border border-[#EAE5D9] p-1.5 rounded-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold shadow-sm"
                             >
                               ✕
                             </button>
@@ -3923,8 +4104,8 @@ export default function Home() {
                           <div className="space-y-3">
                             <span className="text-2xl">👤</span>
                             <div className="space-y-1">
-                              <p className="text-xs font-bold text-white">Upload Your Photo</p>
-                              <p className="text-[9px] text-zinc-500">Provide a clear full-body portrait image</p>
+                              <p className="text-xs font-extrabold text-[var(--text-primary)]">Upload Your Photo</p>
+                              <p className="text-[9px] text-[var(--text-secondary)] font-bold">Provide a clear full-body portrait image</p>
                             </div>
                             <input
                               type="file"
@@ -3944,7 +4125,7 @@ export default function Home() {
                             />
                             <label
                               htmlFor="vton-file"
-                              className="inline-block px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded-lg text-[10px] cursor-pointer"
+                              className="inline-block px-3.5 py-2 bg-white border border-[#EAE5D9] text-[var(--text-secondary)] hover:bg-[#F5F2EB] font-bold rounded-xl text-[10px] cursor-pointer"
                             >
                               Choose File
                             </label>
@@ -3953,19 +4134,19 @@ export default function Home() {
                       </div>
 
                       {/* Right side: Select item & run */}
-                      <div className="border border-zinc-850 bg-zinc-950/20 rounded-xl p-4 flex flex-col justify-between min-h-[250px]">
+                      <div className="border border-[#EAE5D9] bg-[#FAF8F5] rounded-2xl p-4 flex flex-col justify-between min-h-[250px]">
                         <div className="space-y-3">
-                          <h4 className="text-[10px] uppercase font-bold text-zinc-400">Target Garment</h4>
-                          <div className="flex gap-3 items-center border border-zinc-850 bg-zinc-950/40 p-2.5 rounded-lg">
-                            <div className="w-12 h-12 bg-black rounded overflow-hidden flex-shrink-0">
-                              <img src={visualModal.items[0]?.primary_image_url || ''} alt="" className="object-cover w-full h-full" />
+                          <h4 className="text-[10px] uppercase font-black text-[var(--text-secondary)]">Target Garment</h4>
+                          <div className="flex gap-3 items-center border border-[#EAE5D9] bg-white p-2.5 rounded-xl shadow-xs">
+                            <div className="w-12 h-12 bg-white rounded-lg border border-[#EAE5D9] overflow-hidden flex-shrink-0">
+                              <img src={visualModal.items[0]?.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
                             </div>
                             <div>
-                              <p className="text-xs font-bold text-white truncate max-w-[150px]">{visualModal.items[0]?.sub_category}</p>
-                              <p className="text-[9px] text-zinc-500">{visualModal.items[0]?.brand || 'Boutique'}</p>
+                              <p className="text-xs font-extrabold text-[var(--text-primary)] truncate max-w-[150px]">{visualModal.items[0]?.sub_category}</p>
+                              <p className="text-[9px] text-[var(--text-secondary)] font-bold">{visualModal.items[0]?.brand || 'Boutique'}</p>
                             </div>
                           </div>
-                          <p className="text-[10px] text-zinc-500 leading-normal">
+                          <p className="text-[10px] text-[var(--text-secondary)] leading-normal font-bold">
                             Using IDM-VTON diffusion models to drape your garment onto your uploaded portrait.
                           </p>
                         </div>
@@ -4001,10 +4182,10 @@ export default function Home() {
                               setVisualModal({ ...visualModal, loading: false });
                             }
                           }}
-                          className={`w-full py-2 rounded-xl text-xs font-bold transition ${
+                          className={`w-full py-2.5 rounded-xl text-xs font-black transition ${
                             visualModal.personImage 
-                              ? 'bg-teal-400 text-black hover:bg-teal-300' 
-                              : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                              ? 'bg-[var(--accent-terracotta)] text-white hover:bg-[var(--accent-terracotta)]/95 shadow-md' 
+                              : 'bg-[#F5F2EB] text-stone-400 border border-[#EAE5D9] cursor-not-allowed'
                           }`}
                         >
                           ✨ Run Try-On
@@ -4021,7 +4202,7 @@ export default function Home() {
 
       {/* EDITING DIALOG MODAL */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
           <div 
             onDragOver={(e) => e.preventDefault()}
             onDrop={async (e) => {
@@ -4031,11 +4212,11 @@ export default function Home() {
                 await uploadImageToGarment(file);
               }
             }}
-            className="bg-[#1f2833] border border-zinc-800 rounded-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto relative"
+            className="bg-white border border-[#EAE5D9] rounded-3xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto relative text-[var(--text-primary)] shadow-2xl shadow-stone-300"
           >
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <h3 className="text-sm font-bold text-white">Edit Garment Curation</h3>
-              <button onClick={() => setEditingItem(null)} className="text-zinc-400 hover:text-white">✕</button>
+            <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3">
+              <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Edit Garment Curation</h3>
+              <button onClick={() => setEditingItem(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold">✕</button>
             </div>
 
             <form onSubmit={async (e) => {
@@ -4059,9 +4240,9 @@ export default function Home() {
               }
             }} className="space-y-3">
               
-              <div className="relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-zinc-700 bg-black flex flex-col items-center justify-center">
+              <div className="relative w-32 h-32 mx-auto rounded-2xl overflow-hidden border border-[#EAE5D9] bg-[#FBFBFA] flex flex-col items-center justify-center p-1.5 shadow-inner">
                 {editingItem.primary_image_url && (
-                  <img src={editingItem.primary_image_url} alt="" className="object-contain w-full h-full" />
+                  <img src={editingItem.primary_image_url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
                 )}
               </div>
               <div className="space-y-2">
@@ -4071,7 +4252,7 @@ export default function Home() {
                     value={searchQueryText}
                     onChange={(e) => setSearchQueryText(e.target.value)}
                     placeholder="Search query (e.g. White Oxford Shirt)..."
-                    className="flex-1 bg-[#0b0c10] border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-400"
+                    className="flex-1 bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40"
                   />
                   <button
                     type="button"
@@ -4079,17 +4260,11 @@ export default function Home() {
                       setIsSearchingImage(true);
                       setSearchResults(null);
                       try {
-                        const res = await fetch('/api/items/search-image', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            brand: '',
-                            description: searchQueryText
-                          }),
-                        });
+                        const q = encodeURIComponent(searchQueryText);
+                        const res = await fetch(`/api/items/search-image?query=${q}`);
                         const data = await res.json();
                         if (res.ok) {
-                          setSearchResults(data.images || []);
+                          setSearchResults(data.results);
                         } else {
                           alert(`Search failed: ${data.error || 'Unknown error'}`);
                         }
@@ -4099,50 +4274,21 @@ export default function Home() {
                         setIsSearchingImage(false);
                       }
                     }}
-                    className="px-4 py-1.5 bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shrink-0"
+                    disabled={isSearchingImage}
+                    className="px-3 py-1.5 bg-[#FAF8F5] border border-[#EAE5D9] text-[var(--accent-terracotta)] rounded-xl text-xs font-black transition hover:bg-[#F5F2EB] active:scale-95"
                   >
                     {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
                   </button>
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  id="manual-photo-upload"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      await uploadImageToGarment(file);
-                    }
-                  }}
-                />
-                <label
-                  htmlFor="manual-photo-upload"
-                  className="w-full py-2 text-xs bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer text-center"
-                >
-                  📁 Upload Photo
-                </label>
-              </div>
 
-              {/* SEARCH RESULTS PANEL */}
-              {searchResults && (
-                <div className="border border-zinc-800 rounded-xl p-3 bg-zinc-950/60 space-y-3 animate-fade-in">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] uppercase font-bold text-teal-400">Web Search Results</h4>
-                    <button
-                      type="button"
-                      onClick={() => setSearchResults(null)}
-                      className="text-zinc-500 hover:text-white text-xs"
-                    >
-                      ✕ Close
-                    </button>
-                  </div>
-                  
-                  {searchResults.length === 0 ? (
-                    <p className="text-[10px] text-zinc-500 text-center py-2">No matching manufacturer photos found.</p>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
-                      {searchResults.map((img: any, idx: number) => (
+                {searchResults && (
+                  <div className="border border-[#EAE5D9] bg-[#FAF8F5] rounded-2xl p-3.5 space-y-2.5">
+                    <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] font-extrabold uppercase">
+                      <span>Add Alternate/Gallery Photo</span>
+                      <button type="button" onClick={() => setSearchResults(null)} className="text-[var(--accent-terracotta)]">Close</button>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {searchResults.slice(0, 4).map((img: any, idx: number) => (
                         <div
                           key={idx}
                           onClick={async () => {
@@ -4165,7 +4311,6 @@ export default function Home() {
                                 });
                                 await fetchItems();
                                 setSearchResults(null);
-                                alert('✨ Garment photo successfully added to gallery!');
                               } else {
                                 alert(`Failed to add photo: ${data.error || 'Unknown error'}`);
                               }
@@ -4175,40 +4320,40 @@ export default function Home() {
                               setIsReplacingImage(false);
                             }
                           }}
-                          className="relative aspect-square border border-zinc-800 rounded-lg overflow-hidden bg-black cursor-pointer hover:border-teal-400 transition group"
+                          className="relative aspect-square border border-[#EAE5D9] rounded-xl overflow-hidden bg-white cursor-pointer hover:border-[var(--accent-terracotta)] transition group"
                         >
-                          <img src={img.url} alt="" className="object-contain w-full h-full" />
-                          <div className="absolute inset-x-0 bottom-0 bg-black/80 text-[7px] text-zinc-400 px-1 py-0.5 truncate text-center group-hover:text-teal-400">
+                          <img src={img.url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
+                          <div className="absolute inset-x-0 bottom-0 bg-white/80 text-[7px] text-[var(--text-secondary)] px-1 py-0.5 truncate text-center group-hover:text-[var(--accent-terracotta)] font-bold">
                             {img.source}
                           </div>
                           {isReplacingImage && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] text-teal-400 animate-pulse">
-                              Replacing...
+                            <div className="absolute inset-0 bg-white/60 flex items-center justify-center text-[8px] text-[var(--accent-terracotta)] animate-pulse font-bold">
+                              Adding...
                             </div>
                           )}
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
 
               {/* Thumbnails list in editor */}
               <div className="relative flex justify-center gap-1.5 overflow-x-auto py-1">
                 {isUploadingImage && (
-                  <div className="absolute inset-0 bg-black/60 z-30 flex items-center justify-center rounded-lg">
-                    <div className="w-4 h-4 rounded-full border border-teal-400 border-t-transparent animate-spin"></div>
+                  <div className="absolute inset-0 bg-white/60 z-30 flex items-center justify-center rounded-2xl">
+                    <div className="w-4 h-4 rounded-full border border-[var(--accent-terracotta)] border-t-transparent animate-spin"></div>
                   </div>
                 )}
-                {editingItem.images.map((img) => (
+                {editingItem.images.map((img: any) => (
                   <div 
                     key={img.id} 
                     onClick={() => setPrimaryImage(img.id)}
-                    className={`relative w-9 h-9 border rounded overflow-hidden bg-black shrink-0 cursor-pointer group transition ${
-                      img.is_primary_profile ? 'border-teal-400 ring-1 ring-teal-400' : 'border-zinc-800 hover:border-zinc-600'
+                    className={`relative w-9 h-9 border rounded-xl overflow-hidden bg-white shrink-0 cursor-pointer group transition ${
+                      img.is_primary_profile ? 'border-[var(--accent-terracotta)] ring-1 ring-[var(--accent-terracotta)]' : 'border-[#EAE5D9] hover:border-[#DCD1C0]'
                     }`}
                   >
-                    <img src={img.storage_path} alt="" className="object-cover w-full h-full" />
+                    <img src={img.storage_path} alt="" className="object-contain w-full h-full mix-blend-multiply" />
                     {!img.is_primary_profile && (
                       <button
                         type="button"
@@ -4216,7 +4361,7 @@ export default function Home() {
                           e.stopPropagation();
                           deleteGarmentImage(img.id);
                         }}
-                        className="absolute top-0.5 right-0.5 w-3 h-3 bg-rose-600 hover:bg-rose-500 rounded-full flex items-center justify-center text-[6px] text-white font-extrabold opacity-0 group-hover:opacity-100 transition"
+                        className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-[var(--accent-terracotta)] hover:bg-[var(--accent-terracotta)]/85 rounded-full flex items-center justify-center text-[7px] text-white font-extrabold opacity-0 group-hover:opacity-100 transition"
                       >
                         ✕
                       </button>
@@ -4227,11 +4372,11 @@ export default function Home() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-505">Category</label>
+                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Category</label>
                   <select
                     value={editingItem.category}
                     onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   >
                     <option value="Tops">Tops</option>
                     <option value="Bottoms">Bottoms</option>
@@ -4242,11 +4387,11 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-505">Status</label>
+                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Status</label>
                   <select
                     value={editingItem.status}
                     onChange={(e) => setEditingItem({ ...editingItem, status: e.target.value as any })}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   >
                     <option value="Active">Active Closet</option>
                     <option value="Archive">Archive (Doesn't Fit)</option>
@@ -4256,104 +4401,115 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-400">Sub-Category</label>
+                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Sub-Category</label>
                   <input
                     type="text"
                     value={editingItem.sub_category}
                     onChange={(e) => setEditingItem({ ...editingItem, sub_category: e.target.value })}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-400">Brand</label>
+                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Brand</label>
                   <input
                     type="text"
                     value={editingItem.brand || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, brand: e.target.value || null })}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-400">Purchase Price ($)</label>
+                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Purchase Price ($)</label>
                   <input
                     type="number"
                     value={editingItem.price || 0}
                     onChange={(e) => setEditingItem({ ...editingItem, price: Number(e.target.value) })}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-400">Purchase Year</label>
+                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Purchase Year</label>
                   <input
                     type="number"
                     placeholder="e.g. 2026"
                     value={editingItem.purchase_year || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, purchase_year: e.target.value ? Number(e.target.value) : null })}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-400">Fabric</label>
+                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Fabric</label>
                   <input
                     type="text"
                     value={editingItem.fabric_type || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, fabric_type: e.target.value || null })}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-400">Fit Block</label>
+                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Fit Block</label>
                   <input
                     type="text"
                     value={editingItem.fit_block || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, fit_block: e.target.value || null })}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-400">Color Family</label>
+                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Color Family</label>
                   <input
                     type="text"
                     value={editingItem.color_family}
                     onChange={(e) => setEditingItem({ ...editingItem, color_family: e.target.value })}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Sleeve / Detail</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Long Sleeve, Short Sleeve"
+                    value={editingItem.style_detail || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, style_detail: e.target.value || null })}
+                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Notes Field */}
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-zinc-400">📝 Notes</label>
+                <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">📝 Notes</label>
                 <textarea
                   value={editingItem.notes || ''}
                   onChange={(e) => setEditingItem({ ...editingItem, notes: e.target.value || null })}
                   placeholder="Add personal notes, care instructions, styling ideas..."
                   rows={3}
-                  className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white resize-none focus:outline-none focus:border-teal-400/50"
+                  className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2.5 text-xs text-[var(--text-primary)] resize-none focus:outline-none focus:border-[var(--accent-terracotta)]/40"
                 />
               </div>
 
               {/* Created / Updated dates */}
-              <div className="flex gap-3 text-[10px] text-zinc-600">
-                <span>Added: <span className="text-zinc-500">{editingItem.created_at ? new Date(editingItem.created_at).toLocaleDateString() : '—'}</span></span>
+              <div className="flex gap-3 text-[10px] text-[var(--text-secondary)]">
+                <span>Added: <span className="text-[var(--text-primary)] font-bold">{editingItem.created_at ? new Date(editingItem.created_at).toLocaleDateString() : '—'}</span></span>
               </div>
 
               {/* Curation Actions + Wear History */}
-              <div className="space-y-2 border-t border-zinc-800 pt-2.5">
-                <div className="flex gap-2 items-center justify-between text-xs text-zinc-400">
-                  <span className="text-[10px] uppercase font-bold text-zinc-400">Wear History</span>
+              <div className="space-y-2 border-t border-[#EAE5D9] pt-2.5">
+                <div className="flex gap-2 items-center justify-between text-xs text-[var(--text-secondary)]">
+                  <span className="text-[10px] uppercase font-bold">Wear History</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-zinc-300 font-bold">{getItemWornCount(editingItem.id)}x total</span>
+                    <span className="text-[var(--text-primary)] font-extrabold">{getItemWornCount(editingItem.id)}x total</span>
                     <button
                       type="button"
                       onClick={() => logGarmentWorn(editingItem.id)}
-                      className="px-3 py-1 rounded bg-teal-400 text-black font-bold text-xs"
+                      className="px-3 py-1 rounded-lg bg-[var(--accent-terracotta)] text-white font-extrabold text-xs"
                     >
                       + Log Wear
                     </button>
@@ -4362,17 +4518,17 @@ export default function Home() {
                 {/* Collapsible scrollable history */}
                 {wearLogs.filter(l => l.garment_id === editingItem.id).length > 0 && (
                   <details className="group">
-                    <summary className="text-[10px] text-zinc-500 cursor-pointer hover:text-zinc-300 transition select-none list-none flex items-center gap-1">
+                    <summary className="text-[10px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)] transition select-none list-none flex items-center gap-1 font-bold">
                       <span className="group-open:hidden">▶</span>
                       <span className="hidden group-open:inline">▼</span>
                       {wearLogs.filter(l => l.garment_id === editingItem.id).length} wear entries
                     </summary>
-                    <div className="mt-1.5 max-h-32 overflow-y-auto space-y-0.5 bg-zinc-950/50 rounded-lg p-2">
+                    <div className="mt-1.5 max-h-32 overflow-y-auto space-y-0.5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2.5">
                       {wearLogs
                         .filter(l => l.garment_id === editingItem.id)
                         .sort((a, b) => new Date(b.worn_at).getTime() - new Date(a.worn_at).getTime())
                         .map((log, idx) => (
-                          <div key={log.id} className="flex items-center justify-between text-[10px] text-zinc-400 py-0.5 border-b border-zinc-800/60 last:border-0">
+                          <div key={log.id} className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] py-0.5 border-b border-[#FAF8F5] last:border-0 font-semibold">
                             <span>#{wearLogs.filter(l => l.garment_id === editingItem.id).length - idx}</span>
                             <span>{new Date(log.worn_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
                           </div>
@@ -4383,8 +4539,8 @@ export default function Home() {
               </div>
 
               {/* STYLE PAIRINGS COORDINATION */}
-              <div className="space-y-2 border-t border-zinc-800 pt-2.5">
-                <span className="text-[10px] uppercase font-bold text-zinc-400">👖 Wardrobe Pairings (In Closet)</span>
+              <div className="space-y-2 border-t border-[#EAE5D9] pt-2.5">
+                <span className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">👖 Wardrobe Pairings (In Closet)</span>
                 <div className="flex gap-2 overflow-x-auto py-1 scrollbar-none">
                   {items
                     .filter(i => i.id !== editingItem.id && (
@@ -4399,10 +4555,10 @@ export default function Home() {
                         key={pairing.id}
                         type="button"
                         onClick={() => setEditingItem(pairing)}
-                        className="w-10 h-10 border border-zinc-800 rounded-lg overflow-hidden bg-black shrink-0 relative hover:border-teal-400 transition"
+                        className="w-10 h-10 border border-[#EAE5D9] rounded-xl overflow-hidden bg-white shrink-0 relative hover:border-[var(--accent-terracotta)] transition"
                         title={`Pair with ${pairing.brand || 'Unbranded'} ${pairing.sub_category}`}
                       >
-                        <img src={pairing.primary_image_url || ''} alt="" className="object-cover w-full h-full" />
+                        <img src={pairing.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
                       </button>
                     ))}
                 </div>
@@ -4413,13 +4569,13 @@ export default function Home() {
                     setActiveTab('stylist');
                     setEditingItem(null);
                   }}
-                  className="w-full py-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-wider active:scale-[0.98] transition mt-1"
+                  className="w-full py-2.5 bg-[#FAF8F5] text-[var(--accent-terracotta)] border border-[#EAE5D9] rounded-xl text-[10px] font-black uppercase tracking-wider active:scale-[0.98] transition mt-1"
                 >
                   🤖 Style Outfit Around This
                 </button>
               </div>
 
-              <div className="flex justify-between pt-3 border-t border-zinc-800 mt-2">
+              <div className="flex justify-between pt-3 border-t border-[#EAE5D9] mt-2">
                 <button
                   type="button"
                   onClick={async () => {
@@ -4434,7 +4590,7 @@ export default function Home() {
                       console.error(err);
                     }
                   }}
-                  className="px-4 py-2 bg-rose-600/20 text-rose-400 border border-rose-500/20 hover:bg-rose-600/30 rounded-xl text-xs font-bold transition"
+                  className="px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-xl text-xs font-bold transition"
                 >
                   Delete
                 </button>
@@ -4450,20 +4606,20 @@ export default function Home() {
                       setEditingItem(null);
                       await runClientSideCutout(editingItem.id, primaryImg.storage_path);
                     }}
-                    className="px-4 py-2 bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                    className="px-4 py-2 bg-[#FAF8F5] text-[var(--accent-terracotta)] border border-[#EAE5D9] hover:bg-[#F5F2EB] rounded-xl text-xs font-bold transition flex items-center gap-1"
                   >
                     ✨ Run AI Cutout
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditingItem(null)}
-                    className="px-4 py-2 bg-zinc-850 text-zinc-300 hover:bg-zinc-800 rounded-xl text-xs font-bold"
+                    className="px-4 py-2 bg-[#F5F2EB] text-stone-600 hover:bg-stone-200 rounded-xl text-xs font-bold border border-[#EAE5D9]"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-teal-400 text-black hover:bg-teal-300 rounded-xl text-xs font-bold"
+                    className="px-4 py-2 bg-[var(--accent-terracotta)] text-white hover:bg-[var(--accent-terracotta)]/95 rounded-xl text-xs font-bold shadow-md"
                   >
                     {isSavingEdit ? 'Saving...' : 'Save Changes'}
                   </button>
@@ -4476,11 +4632,11 @@ export default function Home() {
 
       {/* MOBILE BOTTOM NAVIGATION BAR */}
       {!validationTarget && (
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-45 bg-[#0b0c10]/95 backdrop-blur-md border-t border-zinc-850 flex justify-around items-center py-2.5 pb-6 select-none shadow-2xl">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-45 bg-[#FAF8F5]/95 backdrop-blur-md border-t border-[#EAE5D9] flex justify-around items-center py-2.5 pb-6 select-none shadow-2xl">
           <button
             onClick={() => setActiveTab('snap')}
             className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
-              activeTab === 'snap' ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+              activeTab === 'snap' ? 'text-[var(--accent-terracotta)] font-black' : 'text-stone-500 font-semibold'
             }`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -4490,7 +4646,7 @@ export default function Home() {
           <button
             onClick={() => setActiveTab('closet')}
             className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
-              activeTab === 'closet' ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+              activeTab === 'closet' ? 'text-[var(--accent-terracotta)] font-black' : 'text-stone-500 font-semibold'
             }`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
@@ -4500,7 +4656,7 @@ export default function Home() {
           <button
             onClick={() => setActiveTab('spreadsheet')}
             className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
-              activeTab === 'spreadsheet' ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+              activeTab === 'spreadsheet' ? 'text-[var(--accent-terracotta)] font-black' : 'text-stone-500 font-semibold'
             }`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
@@ -4510,7 +4666,7 @@ export default function Home() {
           <button
             onClick={() => setActiveTab('stylist')}
             className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
-              activeTab === 'stylist' ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+              activeTab === 'stylist' ? 'text-[var(--accent-terracotta)] font-black' : 'text-stone-500 font-semibold'
             }`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
@@ -4520,7 +4676,7 @@ export default function Home() {
           <button
             onClick={() => setActiveTab('metrics')}
             className={`flex flex-col items-center gap-1.5 py-1 px-3 rounded-xl transition-all ${
-              activeTab === 'metrics' ? 'text-teal-400 font-black' : 'text-zinc-550 font-semibold'
+              activeTab === 'metrics' ? 'text-[var(--accent-terracotta)] font-black' : 'text-stone-500 font-semibold'
             }`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" /></svg>
@@ -4528,10 +4684,11 @@ export default function Home() {
           </button>
         </nav>
       )}
+
       {/* FLOATING CHAT BUBBLE */}
       <button
         onClick={() => setChatOpen(true)}
-        className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-40 w-12 h-12 rounded-full bg-teal-500 hover:bg-teal-400 text-black shadow-2xl flex items-center justify-center transition transform hover:scale-105 active:scale-95"
+        className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-40 w-12 h-12 rounded-full bg-[var(--accent-terracotta)] hover:bg-[var(--accent-terracotta)]/90 text-white shadow-2xl flex items-center justify-center transition transform hover:scale-105 active:scale-95"
         title="Threads AI Stylist"
       >
         <span className="text-xl">💬</span>
@@ -4539,24 +4696,24 @@ export default function Home() {
 
       {/* CHAT DRAWER PANEL */}
       {chatOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#1f2833] border-l border-zinc-800 shadow-2xl flex flex-col animate-slide-left">
+        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white border-l border-[#EAE5D9] shadow-2xl flex flex-col animate-slide-left text-[var(--text-primary)]">
           {/* HEADER */}
-          <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/40">
+          <div className="p-4 border-b border-[#EAE5D9] flex items-center justify-between bg-[#FAF8F5]">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse"></span>
-              <h3 className="text-sm font-bold text-white">Threads AI Stylist</h3>
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-terracotta)] animate-pulse"></span>
+              <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Threads AI Stylist</h3>
             </div>
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setShowChatSettings(!showChatSettings)} 
-                className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-800 transition text-sm"
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-xl hover:bg-[#F5F2EB] transition text-sm"
                 title="AI Settings"
               >
                 ⚙️
               </button>
               <button 
                 onClick={() => setChatOpen(false)} 
-                className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-800 transition text-sm"
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-xl hover:bg-[#F5F2EB] transition text-sm"
               >
                 ✕
               </button>
@@ -4565,15 +4722,15 @@ export default function Home() {
 
           {/* SETTINGS PANEL OVERLAY */}
           {showChatSettings ? (
-            <div className="p-4 border-b border-zinc-800 bg-[#0b0c10]/40 space-y-3">
-              <h4 className="text-[10px] uppercase font-bold text-teal-400">Stylist Model Configuration</h4>
+            <div className="p-4 border-b border-[#EAE5D9] bg-[#FAF8F5] space-y-3">
+              <h4 className="text-[10px] uppercase font-black text-[var(--accent-terracotta)]">Stylist Model Configuration</h4>
               <div className="space-y-2">
                 <div className="space-y-1">
-                  <label className="text-[9px] uppercase font-bold text-zinc-400">AI Provider</label>
+                  <label className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">AI Provider</label>
                   <select 
                     value={chatProvider}
                     onChange={(e) => setChatProvider(e.target.value as any)}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-white border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   >
                     <option value="gemini">Google Gemini (Recommended)</option>
                     <option value="openai">OpenAI GPT-4o-Mini</option>
@@ -4583,7 +4740,7 @@ export default function Home() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] uppercase font-bold text-zinc-400">Custom API Key (Optional)</label>
+                  <label className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">Custom API Key (Optional)</label>
                   <input
                     type="password"
                     placeholder="Enter key to override env default..."
@@ -4592,9 +4749,9 @@ export default function Home() {
                       setChatApiKey(e.target.value);
                       localStorage.setItem('threads_chat_key', e.target.value);
                     }}
-                    className="w-full bg-[#0b0c10] border border-zinc-800 rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-white border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
                   />
-                  <span className="text-[8px] text-zinc-500">Stored locally in your browser's secure cache.</span>
+                  <span className="text-[8px] text-[var(--text-secondary)] font-bold">Stored locally in your browser's secure cache.</span>
                 </div>
                 <button
                   type="button"
@@ -4602,7 +4759,7 @@ export default function Home() {
                     localStorage.setItem('threads_chat_provider', chatProvider);
                     setShowChatSettings(false);
                   }}
-                  className="w-full py-1.5 bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 text-[10px] font-bold rounded-lg transition"
+                  className="w-full py-2 bg-[#FAF8F5] text-[var(--accent-terracotta)] border border-[#EAE5D9] hover:bg-[#F5F2EB] text-[10px] font-black rounded-xl transition"
                 >
                   Save Config
                 </button>
@@ -4611,30 +4768,30 @@ export default function Home() {
           ) : null}
 
           {/* MESSAGES */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#0b0c10]/20">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#FAF8F5]">
             {chatMessages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
                 <span className="text-3xl">🧥</span>
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-zinc-300">How can I help style you today?</p>
-                  <p className="text-[10px] text-zinc-500">Ask about outfits, coordinate combinations, or identify closet clutter.</p>
+                  <p className="text-xs font-extrabold text-[var(--text-primary)]">How can I help style you today?</p>
+                  <p className="text-[10px] text-[var(--text-secondary)] font-bold">Ask about outfits, coordinate combinations, or identify closet clutter.</p>
                 </div>
                 <div className="w-full max-w-xs space-y-2 pt-2">
                   <button
                     onClick={() => sendChatMessage("Suggest a stylish outfit combination for warm weather")}
-                    className="w-full p-2 bg-[#0b0c10]/50 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-[10px] text-left text-zinc-300 transition"
+                    className="w-full p-2.5 bg-white border border-[#EAE5D9] hover:border-[#FAF8F5] rounded-2xl text-[10px] text-left text-[var(--text-primary)] font-bold transition shadow-xs"
                   >
                     ☀️ Suggest a warm weather outfit...
                   </button>
                   <button
                     onClick={() => sendChatMessage("Which items in my closet have the least number of wear counts?")}
-                    className="w-full p-2 bg-[#0b0c10]/50 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-[10px] text-left text-zinc-300 transition"
+                    className="w-full p-2.5 bg-white border border-[#EAE5D9] hover:border-[#FAF8F5] rounded-2xl text-[10px] text-left text-[var(--text-primary)] font-bold transition shadow-xs"
                   >
                     📉 Find my least worn items...
                   </button>
                   <button
                     onClick={() => sendChatMessage("Give me a styling recommendation using my green linen shirt")}
-                    className="w-full p-2 bg-[#0b0c10]/50 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-[10px] text-left text-zinc-300 transition"
+                    className="w-full p-2.5 bg-white border border-[#EAE5D9] hover:border-[#FAF8F5] rounded-2xl text-[10px] text-left text-[var(--text-primary)] font-bold transition shadow-xs"
                   >
                     🟢 Style my green linen shirt...
                   </button>
@@ -4643,10 +4800,10 @@ export default function Home() {
             ) : (
               chatMessages.map((m, idx) => (
                 <div key={idx} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${
+                  <div className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed font-bold shadow-xs ${
                     m.role === 'user' 
-                      ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' 
-                      : 'bg-zinc-900 border border-zinc-800 text-zinc-200'
+                      ? 'bg-[var(--accent-terracotta)] text-white border border-[var(--accent-terracotta)]/40' 
+                      : 'bg-white border border-[#EAE5D9] text-[var(--text-primary)]'
                   }`}>
                     {m.content}
                   </div>
@@ -4655,10 +4812,10 @@ export default function Home() {
             )}
             {isChatTyping && (
               <div className="flex justify-start">
-                <div className="bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-2xl px-3.5 py-2 text-xs flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                <div className="bg-white border border-[#EAE5D9] text-[var(--text-secondary)] rounded-2xl px-3.5 py-2.5 text-xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-terracotta)] animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-terracotta)] animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-terracotta)] animate-bounce" style={{ animationDelay: '300ms' }}></span>
                 </div>
               </div>
             )}
@@ -4670,18 +4827,18 @@ export default function Home() {
               e.preventDefault();
               sendChatMessage();
             }} 
-            className="p-3 border-t border-zinc-800 bg-[#0b0c10]/40 flex gap-2"
+            className="p-3 border-t border-[#EAE5D9] bg-[#FAF8F5] flex gap-2"
           >
             <input
               type="text"
               placeholder="Ask Stylist..."
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              className="flex-1 bg-[#0b0c10] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-400"
+              className="flex-1 bg-white border border-[#EAE5D9] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40 font-bold"
             />
             <button
               type="submit"
-              className="px-4 py-2 bg-teal-500 text-black font-bold text-xs rounded-xl hover:bg-teal-400 transition"
+              className="px-4 py-2 bg-[var(--accent-terracotta)] text-white font-extrabold text-xs rounded-xl hover:bg-[var(--accent-terracotta)]/95 shadow-md active:scale-95 transition"
             >
               Send
             </button>

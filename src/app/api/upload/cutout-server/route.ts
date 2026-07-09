@@ -72,7 +72,7 @@ export async function POST(request: Request) {
             const imageBlob = await imageResponse.blob();
             const buffer = Buffer.from(await imageBlob.arrayBuffer());
 
-            const hfRes = await fetch('https://router.huggingface.co/hf-inference/models/briaai/RMBG-1.4', {
+            const hfRes = await fetch('https://api-inference.huggingface.co/models/briaai/RMBG-1.4', {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${hfToken}`,
@@ -86,11 +86,11 @@ export async function POST(request: Request) {
               const cutoutFileName = `processed/${garmentId}-${Date.now()}.png`;
 
               const { error: cutoutError } = await supabase.storage
-                .from('wardrobe-images')
-                .upload(cutoutFileName, cutoutBuffer, {
-                  contentType: 'image/png',
-                  upsert: true,
-                });
+                 .from('wardrobe-images')
+                 .upload(cutoutFileName, cutoutBuffer, {
+                   contentType: 'image/png',
+                   upsert: true,
+                 });
 
               if (!cutoutError) {
                 const { data: { publicUrl } } = supabase.storage
@@ -129,7 +129,15 @@ export async function POST(request: Request) {
           fs.writeFileSync(tempIn, buffer);
 
           const pyScript = path.join(process.cwd(), 'scripts', 'remove_bg.py');
-          const pyBin = '/Library/Frameworks/Python.framework/Versions/3.13/bin/python3';
+          
+          // Dynamically check system path python3 first, fallback to hardcoded macOS framework binary
+          let pyBin = 'python3';
+          try {
+            execSync('which python3', { stdio: 'ignore' });
+          } catch {
+            pyBin = '/Library/Frameworks/Python.framework/Versions/3.13/bin/python3';
+          }
+          
           const cmd = `"${pyBin}" "${pyScript}" "${tempIn}" "${tempOut}"`;
           try {
             execSync(cmd, { stdio: 'pipe' });

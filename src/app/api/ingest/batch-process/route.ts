@@ -71,10 +71,10 @@ export async function POST(request: Request) {
           
           Classify the item under these rules:
           - Category: Must be exactly one of: 'Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Tailoring'.
-          - Sub-Category: e.g. T-Shirt, Chinos, Chelsea Boots, Bomber Jacket, Blazer.
+          - Sub-Category: Specify the clothing sub-type (e.g., T-Shirt, Chinos, Shorts, Chelsea Boots, Bomber Jacket, Blazer, Sneaker, Oxford). Use 'Shorts' for short pants, and include sleeve length details ('Short Sleeve T-Shirt', 'Long Sleeve Shirt', 'Outer Layer Jacket') if categorizing tops.
           - Style Detail: The single most specific style descriptor for this garment. Examples:
               Tops → 'Long Sleeve', 'Short Sleeve', 'Sleeveless', '3/4 Sleeve', 'Polo', 'Henley', 'Crew Neck', 'V-Neck', 'Button-Down Collar'
-              Bottoms → 'Straight Leg', 'Slim Leg', 'Wide Leg', 'Tapered', 'Cropped', 'Cargo', 'Pleated'
+              Bottoms → 'Shorts', 'Straight Leg', 'Slim Leg', 'Wide Leg', 'Tapered', 'Cropped', 'Cargo', 'Pleated'
               Outerwear → 'Single Breasted', 'Double Breasted', 'Hooded', 'Quilted', 'Zip-Up'
               Footwear → 'Oxford', 'Derby', 'Chelsea Boot', 'Chukka', 'Loafer', 'Sneaker', 'Slip-On'
               Tailoring → 'Single Breasted', 'Double Breasted', 'Peak Lapel', 'Notch Lapel'
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
                 sub_category: { type: 'string' },
                 style_detail: { 
                   type: 'string', 
-                  description: 'Most specific style descriptor: e.g. Long Sleeve, Short Sleeve, Chelsea Boot, Oxford, Wide Leg, Single Breasted' 
+                  description: 'Most specific style descriptor: e.g. Long Sleeve, Short Sleeve, Shorts, Chelsea Boot, Oxford, Wide Leg, Single Breasted' 
                 },
                 brand: { type: 'string' },
                 color_family: { type: 'string' },
