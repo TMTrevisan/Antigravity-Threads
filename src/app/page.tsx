@@ -3747,34 +3747,133 @@ export default function Home() {
                     </div>
 
                     {/* Cost Accounting Bar Chart */}
-                    <div className="p-5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-3xl space-y-4">
-                      <h4 className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider">Estimated Cost Breakdown by Service</h4>
-                      <div className="space-y-3">
-                        {(() => {
-                          const serviceCosts = telemetryLogs.reduce((acc: Record<string, number>, log) => {
-                            const cost = Number(log.estimated_cost) || 0;
-                            acc[log.service] = (acc[log.service] || 0) + cost;
-                            return acc;
-                          }, {});
-                          const maxCost = Math.max(...Object.values(serviceCosts), 0.001);
-                          return Object.entries(serviceCosts).map(([service, cost]) => {
-                            const percent = Math.min((cost / maxCost) * 100, 100);
-                            return (
-                              <div key={service} className="space-y-1">
-                                <div className="flex justify-between text-[10px] font-bold">
-                                  <span className="text-[var(--text-primary)]">{service}</span>
-                                  <span className="text-[var(--accent-terracotta)] font-mono">${cost.toFixed(6)}</span>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="p-5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-3xl space-y-4">
+                        <h4 className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider">Estimated Cost Breakdown by Service</h4>
+                        <div className="space-y-3">
+                          {(() => {
+                            const serviceCosts = telemetryLogs.reduce((acc: Record<string, number>, log) => {
+                              const cost = Number(log.estimated_cost) || 0;
+                              acc[log.service] = (acc[log.service] || 0) + cost;
+                              return acc;
+                            }, {});
+                            const maxCost = Math.max(...Object.values(serviceCosts), 0.001);
+                            return Object.entries(serviceCosts).map(([service, cost]) => {
+                              const percent = Math.min((cost / maxCost) * 100, 100);
+                              return (
+                                <div key={service} className="space-y-1">
+                                  <div className="flex justify-between text-[10px] font-bold">
+                                    <span className="text-[var(--text-primary)]">{service}</span>
+                                    <span className="text-[var(--accent-terracotta)] font-mono">${cost.toFixed(6)}</span>
+                                  </div>
+                                  <div className="w-full bg-stone-200/60 rounded-full h-3 overflow-hidden shadow-inner">
+                                    <div 
+                                      className="bg-[var(--accent-terracotta)] h-3 rounded-full transition-all duration-500" 
+                                      style={{ width: `${percent}%` }}
+                                    />
+                                  </div>
                                 </div>
-                                <div className="w-full bg-stone-200/60 rounded-full h-3 overflow-hidden shadow-inner">
-                                  <div 
-                                    className="bg-[var(--accent-terracotta)] h-3 rounded-full transition-all duration-500" 
-                                    style={{ width: `${percent}%` }}
-                                  />
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Daily Stacked Bar Chart */}
+                      <div className="p-5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-3xl space-y-4 flex flex-col justify-between">
+                        <div>
+                          <h4 className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider mb-1">Daily Cost Breakdown</h4>
+                          <p className="text-[9px] text-[var(--text-secondary)] font-bold">Stacked cost representation of services per day.</p>
+                        </div>
+                        <div className="flex items-end justify-between gap-3 h-36 pt-4 border-b border-[#EAE5D9]">
+                          {(() => {
+                            // Group costs by date and service
+                            const dailyData: Record<string, Record<string, number>> = {};
+                            const servicesSet = new Set<string>();
+                            
+                            telemetryLogs.forEach((log) => {
+                              const dateStr = new Date(log.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                              const cost = Number(log.estimated_cost) || 0;
+                              servicesSet.add(log.service);
+                              if (!dailyData[dateStr]) dailyData[dateStr] = {};
+                              dailyData[dateStr][log.service] = (dailyData[dateStr][log.service] || 0) + cost;
+                            });
+
+                            // Get sorted dates (last 7 days containing logs)
+                            const dates = Object.keys(dailyData).sort().slice(-7);
+                            const serviceColors: Record<string, string> = {
+                              'Gemini Vision': 'bg-[var(--accent-terracotta)]',
+                              'Gemini Ingest': 'bg-[var(--accent-sage)]',
+                              'Gemini Chat': 'bg-amber-500',
+                              'Background Cutout': 'bg-indigo-500',
+                              'Weather API': 'bg-sky-500',
+                            };
+
+                            const defaultColors = ['bg-stone-500', 'bg-stone-400', 'bg-stone-300'];
+                            const serviceColorMap: Record<string, string> = {};
+                            Array.from(servicesSet).forEach((srv, idx) => {
+                              serviceColorMap[srv] = serviceColors[srv] || defaultColors[idx % defaultColors.length];
+                            });
+
+                            // Calculate daily totals to determine height scale
+                            const dailyTotals = dates.map(d => Object.values(dailyData[d]).reduce((a, b) => a + b, 0));
+                            const maxDailyTotal = Math.max(...dailyTotals, 0.0001);
+
+                            return dates.map((date, idx) => {
+                              const total = dailyTotals[idx];
+                              const heightPercent = Math.min((total / maxDailyTotal) * 100, 100);
+                              
+                              return (
+                                <div key={date} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                                  {/* Hover Tooltip */}
+                                  <div className="absolute bottom-full mb-1 bg-zinc-800 text-white text-[8px] p-1.5 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none whitespace-nowrap font-mono font-bold">
+                                    <p className="border-b border-zinc-700 pb-0.5 mb-1 text-[9px] text-[var(--accent-terracotta)]">{date}</p>
+                                    {Object.entries(dailyData[date]).map(([service, val]) => (
+                                      <p key={service}>{service}: ${val.toFixed(6)}</p>
+                                    ))}
+                                    <p className="border-t border-zinc-700 pt-0.5 mt-1 font-extrabold">Total: ${total.toFixed(5)}</p>
+                                  </div>
+
+                                  {/* Stacked bar container */}
+                                  <div className="w-full flex flex-col justify-end rounded-t-sm overflow-hidden" style={{ height: `${heightPercent}%` }}>
+                                    {Object.entries(dailyData[date]).map(([service, cost]) => {
+                                      const segmentPercent = (cost / total) * 100;
+                                      return (
+                                        <div 
+                                          key={service} 
+                                          className={`${serviceColorMap[service]} w-full`} 
+                                          style={{ height: `${segmentPercent}%` }}
+                                          title={`${service}: $${cost.toFixed(6)}`}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                  <span className="text-[8px] font-bold text-[var(--text-secondary)] mt-1.5 whitespace-nowrap">{date}</span>
                                 </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                        {/* Legend */}
+                        <div className="flex flex-wrap gap-2 justify-center pt-2">
+                          {(() => {
+                            const servicesSet = new Set<string>();
+                            telemetryLogs.forEach(l => servicesSet.add(l.service));
+                            const serviceColors: Record<string, string> = {
+                              'Gemini Vision': 'bg-[var(--accent-terracotta)]',
+                              'Gemini Ingest': 'bg-[var(--accent-sage)]',
+                              'Gemini Chat': 'bg-amber-500',
+                              'Background Cutout': 'bg-indigo-500',
+                              'Weather API': 'bg-sky-500',
+                            };
+                            return Array.from(servicesSet).map((srv) => (
+                              <div key={srv} className="flex items-center gap-1">
+                                <span className={`w-2 h-2 rounded-full ${serviceColors[srv] || 'bg-stone-500'}`} />
+                                <span className="text-[8.5px] font-bold text-[var(--text-secondary)]">{srv}</span>
                               </div>
-                            );
-                          });
-                        })()}
+                            ));
+                          })()}
+                        </div>
                       </div>
                     </div>
 
