@@ -308,7 +308,12 @@ export async function POST(request: Request) {
                   const pyScript = path.join(process.cwd(), 'scripts', 'remove_bg.py');
                   const pyBin = '/Library/Frameworks/Python.framework/Versions/3.13/bin/python3';
                   const cmd = `"${pyBin}" "${pyScript}" "${tempIn}" "${tempOut}"`;
-                  execSync(cmd);
+                  try {
+                    execSync(cmd, { stdio: 'pipe' });
+                  } catch (execErr: any) {
+                    console.error('Batch Ingest: Python process failed with output:', execErr.stdout?.toString(), execErr.stderr?.toString());
+                    throw execErr;
+                  }
 
                   if (fs.existsSync(tempOut)) {
                     const cutoutBuffer = fs.readFileSync(tempOut);

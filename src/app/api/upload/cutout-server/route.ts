@@ -131,7 +131,12 @@ export async function POST(request: Request) {
           const pyScript = path.join(process.cwd(), 'scripts', 'remove_bg.py');
           const pyBin = '/Library/Frameworks/Python.framework/Versions/3.13/bin/python3';
           const cmd = `"${pyBin}" "${pyScript}" "${tempIn}" "${tempOut}"`;
-          execSync(cmd);
+          try {
+            execSync(cmd, { stdio: 'pipe' });
+          } catch (execErr: any) {
+            console.error('Python process failed with output:', execErr.stdout?.toString(), execErr.stderr?.toString());
+            throw execErr;
+          }
 
           if (fs.existsSync(tempOut)) {
             const cutoutBuffer = fs.readFileSync(tempOut);
@@ -155,8 +160,8 @@ export async function POST(request: Request) {
           if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
           if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
         }
-      } catch (err) {
-        console.error('Server cutout: Python fallback failed:', err);
+      } catch (err: any) {
+        console.error('Server cutout: Python fallback failed:', err.message || err);
       }
     }
 
