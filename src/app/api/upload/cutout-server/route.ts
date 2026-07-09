@@ -129,7 +129,8 @@ export async function POST(request: Request) {
           fs.writeFileSync(tempIn, buffer);
 
           const pyScript = path.join(process.cwd(), 'scripts', 'remove_bg.py');
-          const cmd = `python3 "${pyScript}" "${tempIn}" "${tempOut}"`;
+          const pyBin = '/Library/Frameworks/Python.framework/Versions/3.13/bin/python3';
+          const cmd = `"${pyBin}" "${pyScript}" "${tempIn}" "${tempOut}"`;
           execSync(cmd);
 
           if (fs.existsSync(tempOut)) {
