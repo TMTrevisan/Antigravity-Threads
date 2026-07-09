@@ -2081,29 +2081,29 @@ export default function Home() {
                 </div>
                 <button
                   onClick={handleExportCSV}
-                  className="px-4 py-2.5 bg-teal-500 text-black font-black text-xs rounded-xl hover:bg-teal-400 active:scale-95 transition-all shadow-lg flex items-center gap-1.5 self-start md:self-auto"
+                  className="px-4 py-2.5 bg-[var(--accent-terracotta)] text-white font-extrabold text-xs rounded-full hover:bg-[var(--accent-terracotta)]/90 active:scale-95 transition-all shadow-md flex items-center gap-1.5 self-start md:self-auto"
                 >
                   📥 Export CSV
                 </button>
               </div>
 
-              <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-[#1f2833]/10 shadow-2xl">
+              <div className="overflow-x-auto rounded-2xl border border-[#EAE5D9] bg-white shadow-xl shadow-stone-200/40">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-zinc-950/40 border-b border-zinc-800 text-zinc-400 font-bold uppercase tracking-wider text-[10px] select-none">
-                      <th className="p-2.5 w-[100px]">Image</th>
-                      <th className="p-2.5 min-w-[90px]">Brand</th>
-                      <th className="p-2.5 w-[88px]">Category</th>
-                      <th className="p-2.5 min-w-[90px]">Sub-Cat</th>
-                      <th className="p-2.5 min-w-[70px]">Color</th>
-                      <th className="p-2.5 min-w-[100px]">Fabric</th>
-                      <th className="p-2.5 min-w-[80px]">Fit</th>
-                      <th className="p-2.5 w-[64px]">$ Price</th>
-                      <th className="p-2.5 w-[60px]">Year</th>
-                      <th className="p-2.5 text-right w-[90px]">Actions</th>
+                    <tr className="bg-[#EFEAE2] border-b border-[#DCD1C0] text-[var(--text-primary)] font-extrabold uppercase tracking-wider text-[10px] select-none">
+                      <th className="p-3 w-[100px]">Image</th>
+                      <th className="p-3 min-w-[90px]">Brand</th>
+                      <th className="p-3 w-[88px]">Category</th>
+                      <th className="p-3 min-w-[90px]">Sub-Cat</th>
+                      <th className="p-3 min-w-[70px]">Color</th>
+                      <th className="p-3 min-w-[100px]">Fabric</th>
+                      <th className="p-3 min-w-[80px]">Fit</th>
+                      <th className="p-3 w-[64px]">$ Price</th>
+                      <th className="p-3 w-[60px]">Year</th>
+                      <th className="p-3 text-right w-[90px]">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-850/60 bg-[#0b0c10]/20">
+                  <tbody className="divide-y divide-[#EAE5D9]/65 bg-white">
                     {items.length === 0 ? (
                       <tr>
                         <td colSpan={10} className="p-8 text-center text-zinc-500 font-semibold">
@@ -2123,19 +2123,19 @@ export default function Home() {
                         const yearVal = editedItems[item.id]?.purchase_year !== undefined ? (editedItems[item.id]?.purchase_year || '') : (item.purchase_year || '');
                         
                         return (
-                          <tr key={item.id} className="hover:bg-zinc-900/30 transition-colors">
+                          <tr key={item.id} className="hover:bg-stone-50/70 odd:bg-white even:bg-[var(--bg-main)]/30 transition-colors">
                             {/* Image Swap */}
                             <td className="p-2">
                                <div className="flex flex-col items-center gap-1">
                                  <div
-                                   className="w-10 h-10 rounded bg-black overflow-hidden border border-zinc-800 cursor-pointer hover:border-teal-400 transition"
+                                   className="w-10 h-10 rounded bg-[#FBF9F4] overflow-hidden border border-stone-200 cursor-pointer hover:border-[var(--accent-terracotta)] transition"
                                    onClick={() => setEditingItem(item)}
                                    title="Click to open editor"
                                  >
                                    {item.primary_image_url ? (
-                                     <img src={item.primary_image_url} alt="" className="w-full h-full object-contain" />
+                                     <img src={item.primary_image_url} alt="" className="w-full h-full object-contain mix-blend-multiply" />
                                    ) : (
-                                     <div className="w-full h-full flex items-center justify-center text-zinc-600 text-[10px]">📷</div>
+                                     <div className="w-full h-full flex items-center justify-center text-stone-400 text-[10px]">📷</div>
                                    )}
                                  </div>
                                  <input
@@ -2161,7 +2161,7 @@ export default function Home() {
                                        }
                                      }
                                    }}
-                                   className="w-full text-[8px] bg-zinc-900/80 border border-zinc-800 rounded px-1 py-0.5 text-zinc-300 placeholder-zinc-650 focus:outline-none focus:border-teal-400"
+                                   className="w-full text-[8px] bg-white border border-stone-200 rounded px-1 py-0.5 text-stone-800 placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]"
                                  />
                                </div>
                              </td>
@@ -2171,7 +2171,7 @@ export default function Home() {
                                 type="text"
                                 value={brandVal}
                                 onChange={(e) => handleSpreadsheetFieldChange(item.id, 'brand', e.target.value || null)}
-                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                                className="w-full text-[11px] bg-white border border-stone-200 rounded px-2.5 py-1.5 text-stone-800 focus:outline-none focus:border-[var(--accent-terracotta)]"
                               />
                             </td>
                             {/* Category */}
@@ -2179,7 +2179,7 @@ export default function Home() {
                               <select
                                 value={categoryVal}
                                 onChange={(e) => handleSpreadsheetFieldChange(item.id, 'category', e.target.value)}
-                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                                className="w-full text-[11px] bg-white border border-stone-200 rounded px-2.5 py-1.5 text-stone-800 focus:outline-none focus:border-[var(--accent-terracotta)]"
                               >
                                 <option value="Tops">Tops</option>
                                 <option value="Bottoms">Bottoms</option>
@@ -2194,7 +2194,7 @@ export default function Home() {
                                 type="text"
                                 value={subCategoryVal}
                                 onChange={(e) => handleSpreadsheetFieldChange(item.id, 'sub_category', e.target.value)}
-                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                                className="w-full text-[11px] bg-white border border-stone-200 rounded px-2.5 py-1.5 text-stone-800 focus:outline-none focus:border-[var(--accent-terracotta)]"
                               />
                             </td>
                             {/* Color */}
@@ -2203,7 +2203,7 @@ export default function Home() {
                                 type="text"
                                 value={colorVal}
                                 onChange={(e) => handleSpreadsheetFieldChange(item.id, 'color_family', e.target.value)}
-                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                                className="w-full text-[11px] bg-white border border-stone-200 rounded px-2.5 py-1.5 text-stone-800 focus:outline-none focus:border-[var(--accent-terracotta)]"
                               />
                             </td>
                             {/* Fabric Blend */}
@@ -2212,7 +2212,7 @@ export default function Home() {
                                 type="text"
                                 value={fabricVal}
                                 onChange={(e) => handleSpreadsheetFieldChange(item.id, 'fabric_type', e.target.value || null)}
-                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                                className="w-full text-[11px] bg-white border border-stone-200 rounded px-2.5 py-1.5 text-stone-800 focus:outline-none focus:border-[var(--accent-terracotta)]"
                                 placeholder="e.g. 100% Cotton"
                               />
                             </td>
@@ -2222,7 +2222,7 @@ export default function Home() {
                                 type="text"
                                 value={fitVal}
                                 onChange={(e) => handleSpreadsheetFieldChange(item.id, 'fit_block', e.target.value || null)}
-                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                                className="w-full text-[11px] bg-white border border-stone-200 rounded px-2.5 py-1.5 text-stone-800 focus:outline-none focus:border-[var(--accent-terracotta)]"
                               />
                             </td>
                             {/* Price */}
@@ -2231,7 +2231,7 @@ export default function Home() {
                                 type="number"
                                 value={priceVal}
                                 onChange={(e) => handleSpreadsheetFieldChange(item.id, 'price', Number(e.target.value))}
-                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                                className="w-full text-[11px] bg-white border border-stone-200 rounded px-2.5 py-1.5 text-stone-800 focus:outline-none focus:border-[var(--accent-terracotta)]"
                               />
                             </td>
                             {/* Year */}
@@ -2240,7 +2240,7 @@ export default function Home() {
                                 type="number"
                                 value={yearVal}
                                 onChange={(e) => handleSpreadsheetFieldChange(item.id, 'purchase_year', e.target.value ? Number(e.target.value) : null)}
-                                className="w-full text-[11px] bg-zinc-900/60 border border-zinc-800/80 rounded px-2 py-1.5 text-white focus:outline-none focus:border-teal-400/50"
+                                className="w-full text-[11px] bg-white border border-stone-200 rounded px-2.5 py-1.5 text-stone-800 focus:outline-none focus:border-[var(--accent-terracotta)]"
                                 placeholder="YYYY"
                               />
                             </td>
@@ -2251,10 +2251,10 @@ export default function Home() {
                                   type="button"
                                   disabled={!hasChanges}
                                   onClick={() => handleSaveSpreadsheetRow(item.id)}
-                                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition ${
+                                  className={`px-3 py-1.5 rounded-full text-[10px] font-extrabold transition uppercase tracking-wider ${
                                     hasChanges 
-                                      ? 'bg-teal-400 text-zinc-950 hover:bg-teal-300 active:scale-95' 
-                                      : 'bg-zinc-850 text-zinc-600 cursor-not-allowed'
+                                      ? 'bg-[var(--accent-sage)] text-white hover:bg-[var(--accent-sage)]/90 active:scale-95 shadow-sm' 
+                                      : 'bg-stone-100 text-stone-400 cursor-not-allowed border border-stone-200/60'
                                   }`}
                                 >
                                   Save
@@ -2262,7 +2262,7 @@ export default function Home() {
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteSpreadsheetRow(item.id)}
-                                  className="px-2 py-1.5 text-[10px] font-bold bg-zinc-900 text-rose-400 hover:bg-rose-500/10 rounded-lg border border-zinc-800 transition active:scale-95"
+                                  className="px-2.5 py-1.5 text-[10px] font-bold bg-white text-[var(--accent-terracotta)] hover:bg-[var(--accent-terracotta)]/10 rounded-full border border-stone-250 transition active:scale-95"
                                 >
                                   ✕
                                 </button>
@@ -3302,22 +3302,22 @@ export default function Home() {
           {/* TAB 3: AI STYLIST */}
           {activeTab === 'stylist' && (
             <div className="space-y-6">
-              <div className="border border-zinc-800 bg-[#1f2833]/20 rounded-2xl p-6 backdrop-blur-sm">
-                <h2 className="text-base font-bold text-white mb-2">Automated AI Stylist</h2>
-                <p className="text-zinc-400 text-xs mb-6">
+              <div className="border border-[#EAE5D9] bg-white rounded-3xl p-6 shadow-xl shadow-stone-200/40">
+                <h2 className="text-base font-extrabold text-[var(--text-primary)] mb-1">Automated AI Stylist</h2>
+                <p className="text-[var(--text-secondary)] text-xs mb-6">
                   Sync weather parameters, pick a preset, and let Gemini compile clothes based on your lookbook constraints.
                 </p>
 
                 <form onSubmit={handleGenerateStylist} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-zinc-400 flex items-center justify-between">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)] flex items-center justify-between">
                         <span>Weather Conditions</span>
                         <button
                           type="button"
                           onClick={syncLocalWeather}
                           disabled={isSyncingWeather}
-                          className="text-[9px] text-teal-400 uppercase"
+                          className="text-[9px] text-[var(--accent-terracotta)] uppercase font-extrabold"
                         >
                           ⚡ {isSyncingWeather ? 'Syncing...' : 'Sync Weather'}
                         </button>
@@ -3327,24 +3327,24 @@ export default function Home() {
                         placeholder="e.g. Temp: 72°F | Precipitation: 0% | Conditions: Sunny"
                         value={weatherInput}
                         onChange={(e) => setWeatherInput(e.target.value)}
-                        className="w-full bg-[#0b0c10]/80 text-xs border border-zinc-800 rounded-lg px-3 py-2 text-white focus:outline-none"
+                        className="w-full bg-[#F5F2EB] text-xs border border-[#EAE5D9] rounded-xl px-4.5 py-3 text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-zinc-400">Event / Vibe</label>
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Event / Vibe</label>
                       <input
                         type="text"
                         placeholder="e.g. Smart casual dinner, office meeting"
                         value={eventInput}
                         onChange={(e) => setEventInput(e.target.value)}
-                        className="w-full bg-[#0b0c10]/80 text-xs border border-zinc-800 rounded-lg px-3 py-2 text-white focus:outline-none"
+                        className="w-full bg-[#F5F2EB] text-xs border border-[#EAE5D9] rounded-xl px-4.5 py-3 text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <span className="text-[9px] uppercase font-bold text-zinc-500">Event Presets</span>
+                    <span className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">Event Presets</span>
                     <div className="flex flex-wrap gap-1.5">
                       {[
                         { label: '💼 Corporate Casual', text: 'Smart business casual meeting' },
@@ -3356,7 +3356,7 @@ export default function Home() {
                           key={preset.label}
                           type="button"
                           onClick={() => setEventInput(preset.text)}
-                          className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-850 text-[10px] text-zinc-400 hover:text-white"
+                          className="px-3 py-1 rounded-full bg-[var(--bg-card-secondary)] border border-[#EAE5D9] text-[10px] text-[var(--text-primary)] font-bold hover:bg-[#EFEAE2] transition"
                         >
                           {preset.label}
                         </button>
@@ -3365,22 +3365,22 @@ export default function Home() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-zinc-400">Lookbook / Aesthetic Vibe</label>
+                    <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Lookbook / Aesthetic Vibe</label>
                     <input
                       type="text"
                       placeholder="e.g. Warm minimal capsule, tailored shapes, high contrast"
                       value={lookbookInput}
                       onChange={(e) => setLookbookInput(e.target.value)}
-                      className="w-full bg-[#0b0c10]/80 text-xs border border-zinc-800 rounded-lg px-3 py-2 text-white focus:outline-none"
+                      className="w-full bg-[#F5F2EB] text-xs border border-[#EAE5D9] rounded-xl px-4.5 py-3 text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40"
                     />
                   </div>
 
                   <div className="flex justify-between items-center pt-2">
-                    <span className="text-xs text-rose-400">{stylingError}</span>
+                    <span className="text-xs text-[var(--accent-terracotta)] font-bold">{stylingError}</span>
                     <button
                       type="submit"
                       disabled={isGenerating}
-                      className="px-5 py-2 rounded-xl bg-teal-400 text-black font-semibold text-xs hover:bg-teal-300 transition"
+                      className="px-5 py-3 rounded-full bg-[var(--accent-terracotta)] text-white font-extrabold text-xs hover:bg-[var(--accent-terracotta)]/90 transition shadow-md active:scale-95 duration-200"
                     >
                       {isGenerating ? 'Designing...' : 'Generate Outfits'}
                     </button>
