@@ -1,26 +1,63 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #F9F6F0;
+  --foreground: #3A3530;
+  
+  --bg-main: #F9F6F0;
+  --bg-sidebar: #D2C4B1;
+  --bg-card-primary: #FFFFFF;
+  --bg-card-secondary: #F3EFE6;
+  --text-primary: #3A3530;
+  --text-secondary: #6E655C;
+  --accent-terracotta: #C86B55;
+  --accent-sage: #8FA89B;
+  --accent-apricot: #EAA97E;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-main);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
+
+/* Chain-stitch embroidered appearance for logo */
+.embroidered-logo {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-shadow: 
+    1px 1px 0px #E5DCCB,
+    -1px -1px 0px #E5DCCB,
+    1px -1px 0px #E5DCCB,
+    -1px 1px 0px #E5DCCB,
+    2px 2px 2px rgba(58, 53, 48, 0.15);
+  letter-spacing: -0.02em;
+}
+
+/* Soft paper stacking shadows */
+.tactile-shadow-sm {
+  box-shadow: 0 2px 8px rgba(110, 101, 92, 0.06);
+}
+
+.tactile-shadow-md {
+  box-shadow: 0 4px 16px rgba(110, 101, 92, 0.08), 0 1px 3px rgba(110, 101, 92, 0.04);
+}
+
+.tactile-shadow-lg {
+  box-shadow: 0 8px 32px rgba(110, 101, 92, 0.1), 0 2px 6px rgba(110, 101, 92, 0.05);
+}
+
+/* Custom Polaroids styling */
+.polaroid-frame {
+  background: #ffffff;
+  padding: 8px 8px 24px 8px;
+  border: 1px solid #EAE5D9;
+  box-shadow: 0 4px 10px rgba(110, 101, 92, 0.08);
+  transform: rotate(-1deg);
+  transition: transform 0.2s ease;
+}
+.polaroid-frame:hover {
+  transform: rotate(1deg) scale(1.02);
+}
+

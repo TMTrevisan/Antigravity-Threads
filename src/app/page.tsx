@@ -1239,7 +1239,7 @@ export default function Home() {
   });
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0b0c10] text-[#c5c6c7] min-h-screen">
+    <div className="flex-1 flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] min-h-screen">
       
       {/* HIDDEN FILE INPUT FOR DETAIL IMAGES */}
       <input 
@@ -1280,14 +1280,15 @@ export default function Home() {
       />
 
       {/* HEADER */}
-      <header className="sticky top-0 z-45 bg-[#0b0c10]/95 backdrop-blur-md border-b border-zinc-805 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-45 bg-[var(--bg-main)]/95 backdrop-blur-md border-b border-[#EAE5D9] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden shadow-inner p-1">
+          <div className="w-10 h-10 rounded-2xl bg-[var(--bg-card-primary)] border border-[#EAE5D9] flex items-center justify-center overflow-hidden shadow-inner p-1">
             <img src="/icon-192.png" alt="Antigravity Logo" className="w-full h-full object-contain" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              Antigravity Threads <span className="text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full font-medium">v2.7</span>
+            <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+              <span className="embroidered-logo">Antigravity Threads</span>
+              <span className="text-[10px] bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/25 px-2 py-0.5 rounded-full font-bold">v2.7</span>
             </h1>
           </div>
         </div>
@@ -1297,7 +1298,7 @@ export default function Home() {
               setShowTelemetry(!showTelemetry);
               if (!showTelemetry) fetchTelemetry();
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-750 transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-full bg-[var(--bg-card-primary)] border border-[#EAE5D9] text-[var(--text-secondary)] hover:bg-[var(--bg-card-secondary)] transition tactile-shadow-sm"
           >
             📉 Cost Metrics: ${telemetry.totalCost}
           </button>
@@ -1308,45 +1309,53 @@ export default function Home() {
       <main className="flex-1 flex flex-col lg:flex-row max-w-7xl w-full mx-auto p-4 sm:p-6 gap-6 mb-24 lg:mb-0">
         
         {/* DESKTOP SIDEBAR NAV */}
-        <aside className="hidden lg:flex flex-col w-60 gap-2 pr-4 border-r border-zinc-805">
-          <p className="text-[10px] tracking-widest uppercase font-bold text-zinc-500 px-3 mb-2">Navigation</p>
+        <aside className="hidden lg:flex flex-col w-60 gap-1.5 p-4 pr-3 bg-[var(--bg-sidebar)] rounded-3xl border border-[#DCD1C0] tactile-shadow-md self-start">
+          <p className="text-[10px] tracking-widest uppercase font-bold text-[var(--text-secondary)] px-3.5 mb-2 select-none">Atelier Navigation</p>
           <button
             onClick={() => setActiveTab('snap')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
-              activeTab === 'snap' ? 'bg-gradient-to-r from-teal-500/10 to-indigo-500/10 text-teal-400 border-l-2 border-teal-400' : 'hover:bg-zinc-800/40 text-zinc-400'
+            className={`flex items-center gap-3 px-4.5 py-3 rounded-full font-bold text-xs uppercase tracking-wider transition-all duration-200 active:scale-95 ${
+              activeTab === 'snap' 
+                ? 'bg-[var(--accent-terracotta)] text-white shadow-md' 
+                : 'hover:bg-white/40 text-[var(--text-primary)]'
             }`}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             Batch Ingest
           </button>
           
           <button
             onClick={() => setActiveTab('closet')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
-              activeTab === 'closet' ? 'bg-gradient-to-r from-teal-500/10 to-indigo-500/10 text-teal-400 border-l-2 border-teal-400' : 'hover:bg-zinc-800/40 text-zinc-400'
+            className={`flex items-center gap-3 px-4.5 py-3 rounded-full font-bold text-xs uppercase tracking-wider transition-all duration-200 active:scale-95 ${
+              activeTab === 'closet' 
+                ? 'bg-[var(--accent-terracotta)] text-white shadow-md' 
+                : 'hover:bg-white/40 text-[var(--text-primary)]'
             }`}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             My Closet ({items.length})
           </button>
 
           <button
             onClick={() => setActiveTab('spreadsheet')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
-              activeTab === 'spreadsheet' ? 'bg-gradient-to-r from-teal-500/10 to-indigo-500/10 text-teal-400 border-l-2 border-teal-400' : 'hover:bg-zinc-800/40 text-zinc-400'
+            className={`flex items-center gap-3 px-4.5 py-3 rounded-full font-bold text-xs uppercase tracking-wider transition-all duration-200 active:scale-95 ${
+              activeTab === 'spreadsheet' 
+                ? 'bg-[var(--accent-terracotta)] text-white shadow-md' 
+                : 'hover:bg-white/40 text-[var(--text-primary)]'
             }`}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
             Spreadsheet
           </button>
 
           <button
             onClick={() => setActiveTab('stylist')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
-              activeTab === 'stylist' ? 'bg-gradient-to-r from-teal-500/10 to-indigo-500/10 text-teal-400 border-l-2 border-teal-400' : 'hover:bg-zinc-800/40 text-zinc-400'
+            className={`flex items-center gap-3 px-4.5 py-3 rounded-full font-bold text-xs uppercase tracking-wider transition-all duration-200 active:scale-95 ${
+              activeTab === 'stylist' 
+                ? 'bg-[var(--accent-terracotta)] text-white shadow-md' 
+                : 'hover:bg-white/40 text-[var(--text-primary)]'
             }`}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
             AI Stylist
           </button>
         </aside>
@@ -1358,15 +1367,15 @@ export default function Home() {
           {activeTab === 'snap' && (
             <div className="space-y-6">
               
-              <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-6 backdrop-blur-sm">
-                <h2 className="text-base font-bold text-white mb-2">Relational Multi-Image Ingest Queue</h2>
-                <p className="text-zinc-400 text-xs mb-6">
+              <div className="border border-[#EAE5D9] bg-[var(--bg-card-secondary)] rounded-3xl p-6 tactile-shadow-md">
+                <h2 className="text-base font-extrabold text-[var(--text-primary)] mb-1">Tactile Atelier Ingest Queue</h2>
+                <p className="text-[var(--text-secondary)] text-xs mb-6">
                   Select primary garment layout photos. Then, add detail shots (laundry tags, textures, sizing labels) under each card container. Gemini will synthesize the data concurrently to extract perfect tags.
                 </p>
 
                 <div className="space-y-6">
                   {/* Primary Ingestion Controller */}
-                  <div className="border border-zinc-800 bg-zinc-900/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-center">
+                  <div className="border-2 border-dashed border-[#DCD1C0] bg-white/50 rounded-3xl p-6 flex flex-col items-center justify-center gap-4 text-center">
                     <input 
                       ref={fileInputRef}
                       type="file" 
@@ -1376,8 +1385,8 @@ export default function Home() {
                       className="hidden" 
                     />
                     <div className="flex flex-col items-center gap-1.5 pointer-events-none">
-                      <svg className="w-8 h-8 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                      <span className="text-xs font-bold text-white">Add Primary Garment Photos</span>
+                      <svg className="w-8 h-8 text-[var(--accent-terracotta)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      <span className="text-xs font-bold text-[var(--text-primary)]">Add Primary Garment Photos</span>
                     </div>
 
                     <div className="flex w-full max-w-sm gap-3 mt-1">
@@ -1385,7 +1394,7 @@ export default function Home() {
                         type="button"
                         style={{ minHeight: '44px' }}
                         onClick={() => cameraInputRef.current?.click()}
-                        className="flex-1 py-3 text-xs font-black bg-teal-400 text-zinc-950 rounded-xl active:scale-[0.98] transition shadow-md flex items-center justify-center gap-1.5"
+                        className="flex-1 py-3 text-xs font-black bg-[var(--accent-terracotta)] text-white rounded-full active:scale-[0.98] transition shadow-md flex items-center justify-center gap-1.5 hover:bg-[var(--accent-terracotta)]/90"
                       >
                         📸 Take Photo
                       </button>
@@ -1393,14 +1402,14 @@ export default function Home() {
                         type="button"
                         style={{ minHeight: '44px' }}
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex-1 py-3 text-xs font-bold bg-zinc-800 text-white rounded-xl active:scale-[0.98] transition border border-zinc-700 flex items-center justify-center gap-1.5"
+                        className="flex-1 py-3 text-xs font-bold bg-[var(--accent-sage)] text-white rounded-full active:scale-[0.98] transition shadow-md flex items-center justify-center gap-1.5 hover:bg-[var(--accent-sage)]/90"
                       >
                         📁 Choose Files
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between w-full max-w-sm border-t border-zinc-800 pt-3.5 mt-1 select-none">
-                      <span className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-1.5">
+                    <div className="flex items-center justify-between w-full max-w-sm border-t border-[#EAE5D9] pt-3.5 mt-1 select-none">
+                      <span className="text-[10px] font-black uppercase text-[var(--text-secondary)] flex items-center gap-1.5">
                         🔄 Continuous Snap Mode
                       </span>
                       <button
@@ -1408,8 +1417,8 @@ export default function Home() {
                         onClick={() => setContinuousSnap(!continuousSnap)}
                         className={`text-[9px] font-bold px-3 py-1.5 rounded-full border transition-all ${
                           continuousSnap 
-                            ? 'bg-teal-400/10 text-teal-400 border-teal-400/20 font-black' 
-                            : 'bg-zinc-900 text-zinc-500 border-zinc-850'
+                            ? 'bg-[var(--accent-terracotta)]/15 text-[var(--accent-terracotta)] border-[var(--accent-terracotta)]/30 font-black' 
+                            : 'bg-white/60 text-[var(--text-secondary)] border-[#DCD1C0]'
                         }`}
                       >
                         {continuousSnap ? 'ON (Auto-Open)' : 'OFF (Single-Snap)'}
@@ -1419,28 +1428,28 @@ export default function Home() {
 
                   {/* Grouped Ingest Cards */}
                   {ingestGroups.length > 0 && (
-                    <div className="space-y-4 pt-4 border-t border-zinc-850">
-                      <div className="flex items-center justify-between text-xs text-zinc-400 font-semibold">
+                    <div className="space-y-4 pt-4 border-t border-[#EAE5D9]">
+                      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-bold">
                         <span>Items Queue ({ingestGroups.length} items configured)</span>
                         <div className="flex items-center gap-3">
                           {selectedIngestGroupIds.length >= 2 && (
                             <button 
                               onClick={handleMergeSelectedGroups} 
-                              className="px-2 py-0.5 bg-teal-400 text-zinc-950 font-black rounded text-[9px] hover:bg-teal-300 transition"
+                              className="px-3 py-1 bg-[var(--accent-apricot)] text-[var(--text-primary)] font-black rounded-full text-[9px] hover:bg-[var(--accent-apricot)]/90 transition shadow-sm"
                             >
                               🔗 Merge Selected ({selectedIngestGroupIds.length})
                             </button>
                           )}
-                          <button onClick={clearIngestGroups} className="text-rose-400">Clear All</button>
+                          <button onClick={clearIngestGroups} className="text-[var(--accent-terracotta)] font-bold hover:underline">Clear All</button>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {ingestGroups.map((group) => (
-                          <div key={group.id} className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl flex flex-col justify-between space-y-3 relative">
+                          <div key={group.id} className="p-5 bg-white border border-[#EAE5D9] rounded-2xl flex flex-col justify-between space-y-4 relative tactile-shadow-sm">
                             {/* Card Header with Merge Checkbox & Delete */}
-                            <div className="flex items-center justify-between border-b border-zinc-900 pb-1.5 mb-1">
-                              <label className="flex items-center gap-1.5 cursor-pointer text-[9px] text-zinc-500 font-bold select-none">
+                            <div className="flex items-center justify-between border-b border-[#F5F2EA] pb-2">
+                              <label className="flex items-center gap-1.5 cursor-pointer text-[9px] text-[var(--text-secondary)] font-bold select-none">
                                 <input
                                   type="checkbox"
                                   checked={selectedIngestGroupIds.includes(group.id)}
@@ -1451,33 +1460,33 @@ export default function Home() {
                                       setSelectedIngestGroupIds(prev => prev.filter(id => id !== group.id));
                                     }
                                   }}
-                                  className="w-3.5 h-3.5 rounded border-zinc-800 text-teal-400 focus:ring-0 focus:ring-offset-0 bg-[#0b0c10]"
+                                  className="w-3.5 h-3.5 rounded border-[#DCD1C0] text-[var(--accent-terracotta)] focus:ring-0 focus:ring-offset-0 bg-white"
                                 />
                                 Select to Merge
                               </label>
                               <button
                                 type="button"
                                 onClick={() => handleDeleteGroup(group.id)}
-                                className="text-[9px] font-bold text-rose-400 hover:text-rose-300 transition"
+                                className="text-[9px] font-bold text-[var(--accent-terracotta)] hover:underline"
                               >
                                 ✕ Delete Card
                               </button>
                             </div>
 
-                            <div className="space-y-2">
-                              {/* Stack of thumbnails */}
-                              <div className="flex items-center flex-wrap gap-2">
+                            <div className="space-y-3">
+                              {/* Stack of thumbnails in polaroid frames */}
+                              <div className="flex items-center flex-wrap gap-3.5">
                                 {group.files.map((file, fIdx) => (
-                                  <div key={fIdx} className="relative w-12 h-12 rounded border border-zinc-800 bg-black overflow-hidden group shrink-0">
-                                    <img src={URL.createObjectURL(file)} alt="" className="object-cover w-full h-full" />
+                                  <div key={fIdx} className="polaroid-frame w-14 h-14 shrink-0 relative">
+                                    <img src={URL.createObjectURL(file)} alt="" className="object-cover w-full h-full rounded-sm" />
                                     {fIdx === 0 && (
-                                      <span className="absolute bottom-0 inset-x-0 bg-teal-400/90 text-black text-[7px] font-extrabold uppercase text-center py-0.5">Primary</span>
+                                      <span className="absolute bottom-0 inset-x-0 bg-[var(--accent-sage)]/90 text-white text-[6px] font-black uppercase text-center py-0.5 rounded-b-sm">Primary</span>
                                     )}
                                     {/* Delete individual photo button */}
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteFileFromGroup(group.id, fIdx)}
-                                      className="absolute top-0 right-0 w-3.5 h-3.5 bg-black/80 hover:bg-rose-900 text-white hover:text-rose-200 text-[8px] flex items-center justify-center rounded-bl transition"
+                                      className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 bg-[var(--accent-terracotta)] text-white hover:bg-[var(--accent-terracotta)]/95 text-[8px] flex items-center justify-center rounded-full shadow-sm transition"
                                       title="Remove image"
                                     >
                                       ✕
@@ -1486,56 +1495,56 @@ export default function Home() {
                                 ))}
                                 <button 
                                   onClick={() => triggerAddDetailCamera(group.id)}
-                                  className="w-12 h-12 rounded border border-dashed border-zinc-700 bg-zinc-900/60 flex flex-col items-center justify-center text-zinc-400 hover:text-white transition"
+                                  className="w-14 h-14 rounded-xl border-2 border-dashed border-[#DCD1C0] bg-[var(--bg-card-secondary)]/50 flex flex-col items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-card-secondary)] transition"
                                   title="Snap Tag Close-up or detail shot"
                                 >
                                   <span className="text-[10px]">📸</span>
-                                  <span className="text-[7px] font-black uppercase">Snap</span>
+                                  <span className="text-[6px] font-bold uppercase tracking-wider mt-0.5">Snap</span>
                                 </button>
                                 <button 
                                   onClick={() => triggerAddDetail(group.id)}
-                                  className="w-12 h-12 rounded border border-dashed border-zinc-700 bg-zinc-900/60 flex flex-col items-center justify-center text-zinc-400 hover:text-white transition"
+                                  className="w-14 h-14 rounded-xl border-2 border-dashed border-[#DCD1C0] bg-[var(--bg-card-secondary)]/50 flex flex-col items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-card-secondary)] transition"
                                   title="Add Tag Close-up or detail shot"
                                 >
                                   <span className="text-[10px]">+</span>
-                                  <span className="text-[7px] font-black uppercase">Detail</span>
+                                  <span className="text-[6px] font-bold uppercase tracking-wider mt-0.5">Detail</span>
                                 </button>
                               </div>
 
                               <div className="space-y-1">
-                                <span className="text-[8px] uppercase font-bold text-zinc-500">Staging notes (e.g. fit, location)</span>
+                                <span className="text-[8px] uppercase font-bold text-[var(--text-secondary)]">Staging notes (e.g. fit, location)</span>
                                 <input 
                                   type="text"
                                   value={group.notes}
                                   onChange={(e) => handleUpdateNotes(group.id, e.target.value)}
-                                  className="w-full text-[10px] bg-[#0b0c10] border border-zinc-850 rounded px-2 py-1 text-white focus:outline-none"
+                                  className="w-full text-[10px] bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-terracotta)]/40"
                                   placeholder="Brand details, sizing labels details..."
                                 />
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between text-[10px] pt-2 border-t border-zinc-855">
-                              <span className="text-zinc-500">Images: {group.files.length}</span>
+                            <div className="flex items-center justify-between text-[10px] pt-2.5 border-t border-[#F5F2EA]">
+                              <span className="text-[var(--text-secondary)] font-bold">Images: {group.files.length}</span>
                               <div className="flex items-center gap-2">
                                 {group.status === 'failed' && (
                                   <button
                                     type="button"
                                     onClick={() => retryGroupUpload(group.id)}
-                                    className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 transition text-[9px] font-bold"
+                                    className="px-2.5 py-1 rounded-full bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/20 hover:bg-[var(--accent-terracotta)]/20 transition text-[9px] font-bold"
                                   >
                                     🔄 Retry
                                   </button>
                                 )}
-                                <span className={`font-bold ${
-                                  group.status === 'done' ? 'text-teal-400' :
-                                  group.status === 'uploading' ? 'text-zinc-400 animate-pulse' :
-                                  group.status === 'processing' ? 'text-indigo-400 animate-pulse' :
-                                  group.status === 'failed' ? 'text-rose-500' : 'text-zinc-550'
+                                <span className={`font-bold text-[9px] px-2 py-0.5 rounded-full ${
+                                  group.status === 'done' ? 'bg-[var(--accent-sage)]/10 text-[var(--accent-sage)]' :
+                                  group.status === 'uploading' ? 'text-[var(--text-secondary)] animate-pulse' :
+                                  group.status === 'processing' ? 'text-[var(--accent-apricot)] animate-pulse' :
+                                  group.status === 'failed' ? 'bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)]' : 'text-zinc-550'
                                 }`}>{group.status.toUpperCase()}</span>
                               </div>
                             </div>
                             {group.status === 'failed' && group.error && (
-                              <div className="text-[9px] text-rose-400 bg-rose-950/20 border border-rose-500/10 rounded-lg p-2.5 mt-1.5 leading-relaxed font-mono">
+                              <div className="text-[9px] text-[var(--accent-terracotta)] bg-[var(--accent-terracotta)]/5 border border-[var(--accent-terracotta)]/10 rounded-xl p-2.5 mt-1.5 leading-relaxed font-mono">
                                 ❌ Error: {group.error}
                               </div>
                             )}
@@ -1546,7 +1555,7 @@ export default function Home() {
                       <button
                         onClick={triggerBatchUpload}
                         disabled={isProcessingBatch}
-                        className="w-full py-2 bg-teal-400 text-black font-bold text-xs rounded-lg hover:bg-teal-300 transition"
+                        className="w-full py-3 bg-[var(--accent-terracotta)] text-white font-extrabold text-xs rounded-full hover:bg-[var(--accent-terracotta)]/90 transition shadow-md active:scale-95 duration-200"
                       >
                         {isProcessingBatch ? 'Running Pipeline Workers...' : 'Start Ingest Pipeline'}
                       </button>
@@ -2375,18 +2384,18 @@ export default function Home() {
 
                   {/* Grid View */}
                   {loadingItems ? (
-                    <div className="text-center py-12"><p className="text-zinc-500 text-xs">Loading items...</p></div>
+                    <div className="text-center py-12"><p className="text-[var(--text-secondary)] text-xs">Loading items...</p></div>
                   ) : filteredItems.length === 0 ? (
-                    <div className="text-center py-12 border border-zinc-800/40 border-dashed rounded-xl bg-zinc-900/10">
-                      <p className="text-zinc-500 text-xs">No matching garments found.</p>
+                    <div className="text-center py-12 border border-[#EAE5D9] border-dashed rounded-2xl bg-white/40">
+                      <p className="text-[var(--text-secondary)] text-xs">No matching garments found in your closet.</p>
                     </div>
                   ) : viewMode === 'grid' ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
                       {filteredItems.map((item) => (
                         <div 
                           key={item.id}
                           onClick={() => setEditingItem(item)}
-                          className="group relative border border-zinc-800/50 bg-[#1f2833]/15 rounded-xl overflow-hidden hover:border-zinc-700 cursor-pointer flex flex-col transition"
+                          className="group relative border border-[#EAE5D9] bg-white rounded-3xl overflow-hidden hover:border-[#DCD1C0] cursor-pointer flex flex-col transition-all duration-200 hover:-translate-y-0.5 tactile-shadow-sm"
                         >
                           <input 
                             type="checkbox"
@@ -2395,42 +2404,42 @@ export default function Home() {
                               e.stopPropagation();
                               handleSelectItem(item.id);
                             }}
-                            className="absolute top-2.5 right-2.5 z-10 w-4 h-4 rounded border-zinc-800 accent-teal-400"
+                            className="absolute top-3 right-3 z-10 w-4 h-4 rounded border-[#DCD1C0] text-[var(--accent-terracotta)] accent-[var(--accent-terracotta)] focus:ring-0 bg-white"
                           />
 
-                          <div className="relative w-full aspect-square bg-black border-b border-zinc-850 flex items-center justify-center">
+                          <div className="relative w-full aspect-square bg-[#FBFBFA] border-b border-[#EAE5D9] flex items-center justify-center p-2.5">
                             {item.primary_image_url ? (
-                              <img src={item.primary_image_url} alt="" className="object-cover w-full h-full" />
+                              <img src={item.primary_image_url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
                             ) : (
-                              <div className="text-[10px] text-zinc-500">No Image</div>
+                              <div className="text-[10px] text-[var(--text-secondary)] font-bold">No Photo</div>
                             )}
                             
                             {item.images && item.images.length > 1 && (
-                              <span className="absolute bottom-2 right-2 bg-black/75 px-1.5 py-0.5 rounded text-[8px] font-bold text-teal-400">
+                              <span className="absolute bottom-2.5 right-2.5 bg-white/90 border border-[#EAE5D9] px-2 py-0.5 rounded-full text-[8px] font-black text-[var(--accent-terracotta)] shadow-sm">
                                 📷 {item.images.length}
                               </span>
                             )}
 
                             {item.status === 'Processing' && (
-                              <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-                                <div className="w-3.5 h-3.5 border-2 border-t-teal-400 border-zinc-850 rounded-full animate-spin"></div>
+                              <div className="absolute inset-0 bg-white/70 flex items-center justify-center backdrop-blur-xs">
+                                <div className="w-5 h-5 border-2 border-t-[var(--accent-terracotta)] border-[#EAE5D9] rounded-full animate-spin"></div>
                               </div>
                             )}
                           </div>
 
-                          <div className="p-3 space-y-1">
-                            <div className="flex items-center justify-between text-[8px] uppercase font-extrabold text-zinc-500">
+                          <div className="p-3.5 space-y-1">
+                            <div className="flex items-center justify-between text-[8px] uppercase font-extrabold text-[var(--text-secondary)]">
                               <span>{item.sub_category}</span>
                               {getItemWornCount(item.id) > 0 && (
-                                <span className="text-teal-400">Worn {getItemWornCount(item.id)}x</span>
+                                <span className="text-[var(--accent-sage)] font-black">Worn {getItemWornCount(item.id)}x</span>
                               )}
                             </div>
-                            <h4 className="text-xs font-bold text-white truncate">{item.brand ? `${item.brand} ` : ''}{item.color_family}</h4>
-                            <div className="flex items-center justify-between text-[9px] text-zinc-400 pt-1 border-t border-zinc-800/50 mt-1">
-                              <span>CPW: <strong className="text-zinc-200">${getItemCostPerWear(item)}</strong></span>
+                            <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{item.brand ? `${item.brand} ` : ''}{item.color_family}</h4>
+                            <div className="flex items-center justify-between text-[9px] text-[var(--text-secondary)] pt-2 border-t border-[#F5F2EA] mt-1.5">
+                              <span>CPW: <strong className="text-[var(--text-primary)] font-black">${getItemCostPerWear(item)}</strong></span>
                               <button
                                 onClick={(e) => logGarmentWorn(item.id, e)}
-                                className="text-teal-400 hover:text-teal-300 font-bold"
+                                className="text-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]/85 font-black uppercase text-[8px] tracking-wider"
                               >
                                 + Log Wear
                               </button>
@@ -2440,71 +2449,69 @@ export default function Home() {
                       ))}
                     </div>
                   ) : (
-                    /* Matrix View */
-                    <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-xl overflow-hidden overflow-x-auto">
-                      <table className="w-full text-left border-collapse min-w-[700px] text-xs">
-                        <thead>
-                          <tr className="border-b border-zinc-850 bg-zinc-900/60 font-semibold text-zinc-400">
-                            <th className="p-3 w-10 text-center">
-                              <input 
-                                type="checkbox"
-                                checked={selectedItemIds.length === filteredItems.length}
-                                onChange={toggleSelectAllItems}
-                                className="w-4 h-4 rounded border-zinc-800 bg-[#0b0c10] accent-teal-400 cursor-pointer"
-                              />
-                            </th>
-                            <th className="p-3 w-14">Preview</th>
-                            <th className="p-3">Garment</th>
-                            <th className="p-3">Category</th>
-                            <th className="p-3">Specs (Fabric/Fit)</th>
-                            <th className="p-3 w-16">Price</th>
-                            <th className="p-3 w-16">Worn</th>
-                            <th className="p-3 w-20">CPW</th>
-                            <th className="p-3 w-24">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-850 bg-transparent">
-                          {filteredItems.map((item) => (
-                            <tr 
-                              key={item.id}
-                              onClick={() => setEditingItem(item)}
-                              className="hover:bg-zinc-800/20 cursor-pointer transition text-zinc-300"
-                            >
-                              <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                <input 
-                                  type="checkbox"
-                                  checked={selectedItemIds.includes(item.id)}
-                                  onChange={() => handleSelectItem(item.id)}
-                                  className="w-4 h-4 rounded border-zinc-800 bg-[#0b0c10] accent-teal-400 cursor-pointer"
-                                />
-                              </td>
-                              <td className="p-2">
-                                <div className="w-9 h-9 rounded border border-zinc-800 overflow-hidden bg-black">
-                                  {item.primary_image_url && (
-                                    <img src={item.primary_image_url} alt="" className="object-cover w-full h-full" />
-                                  )}
-                                </div>
-                              </td>
-                              <td className="p-3 font-semibold text-white">
+                    /* Matrix View - Refactored as soft cards list to demolish strict table layout */
+                    <div className="space-y-3.5">
+                      {filteredItems.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => setEditingItem(item)}
+                          className="flex items-center justify-between gap-4 p-4 bg-white border border-[#EAE5D9] rounded-2xl cursor-pointer hover:border-[#DCD1C0] transition-all tactile-shadow-sm group"
+                        >
+                          <div className="flex items-center gap-4 min-w-0" onClick={(e) => e.stopPropagation()}>
+                            <input 
+                              type="checkbox"
+                              checked={selectedItemIds.includes(item.id)}
+                              onChange={() => handleSelectItem(item.id)}
+                              className="w-4 h-4 rounded border-[#DCD1C0] text-[var(--accent-terracotta)] accent-[var(--accent-terracotta)] focus:ring-0 bg-white"
+                            />
+                            <div className="w-12 h-12 rounded-xl border border-[#EAE5D9] overflow-hidden bg-[#FBFBFA] p-1 flex-shrink-0 flex items-center justify-center">
+                              {item.primary_image_url ? (
+                                <img src={item.primary_image_url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
+                              ) : (
+                                <span className="text-[8px] text-[var(--text-secondary)]">📷</span>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-[8px] font-black uppercase text-[var(--text-secondary)] tracking-wider">{item.category}</span>
+                              <h4 className="text-xs font-extrabold text-[var(--text-primary)] truncate mt-0.5">
                                 {item.brand ? `${item.brand} ` : ''}{item.color_family} {item.sub_category}
-                              </td>
-                              <td className="p-3">{item.category}</td>
-                              <td className="p-3 text-zinc-400">{item.fabric_type || 'N/A'} • {item.fit_block || 'N/A'}</td>
-                              <td className="p-3 font-mono">${item.price || '0.00'}</td>
-                              <td className="p-3 text-center font-bold text-teal-400">{getItemWornCount(item.id)}x</td>
-                              <td className="p-3 font-mono text-teal-300 font-bold">${getItemCostPerWear(item)}</td>
-                              <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  onClick={() => logGarmentWorn(item.id)}
-                                  className="px-2 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 transition font-bold"
-                                >
-                                  + Wear
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              </h4>
+                              {/* Style specs into rounded textile tags */}
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="text-[8px] font-black uppercase bg-[var(--bg-card-secondary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-full border border-[#EAE5D9]">
+                                  Fabric: {item.fabric_type || 'N/A'}
+                                </span>
+                                <span className="text-[8px] font-black uppercase bg-[var(--bg-card-secondary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-full border border-[#EAE5D9]">
+                                  Fit: {item.fit_block || 'N/A'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-6 shrink-0">
+                            <div className="text-right">
+                              <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase block">Price</span>
+                              <span className="text-xs font-bold text-[var(--text-primary)]">${item.price || '0'}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase block">Worn</span>
+                              <span className="text-xs font-bold text-[var(--accent-sage)]">{getItemWornCount(item.id)}x</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase block">CPW</span>
+                              <span className="text-xs font-extrabold text-[var(--accent-terracotta)]">${getItemCostPerWear(item)}</span>
+                            </div>
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => logGarmentWorn(item.id)}
+                                className="px-3 py-1.5 rounded-full bg-[var(--accent-terracotta)] text-white hover:bg-[var(--accent-terracotta)]/90 text-[9px] font-extrabold transition shadow-sm"
+                              >
+                                + Wear
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 
@@ -2723,23 +2730,23 @@ export default function Home() {
 
               {/* GAP FINDER & ANALYTICS SUB-TAB */}
               {closetSubTab === 'analytics' && (
-                <div className="space-y-6 animate-fade-in">
+                <div className="space-y-6 animate-fade-in text-[var(--text-primary)]">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Indexing breakdown */}
-                    <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
-                      <h3 className="text-sm font-bold text-white">📊 Category Distribution</h3>
-                      <div className="space-y-3">
+                    <div className="border border-[#EAE5D9] bg-white rounded-3xl p-5 space-y-4 tactile-shadow-sm">
+                      <h3 className="text-sm font-extrabold text-[var(--text-primary)]">📊 Category Distribution</h3>
+                      <div className="space-y-3.5">
                         {['Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Tailoring'].map((cat) => {
                           const count = items.filter(i => i.category === cat).length;
                           const percentage = items.length > 0 ? (count / items.length) * 100 : 0;
                           return (
-                            <div key={cat} className="space-y-1">
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span className="text-zinc-300">{cat}</span>
-                                <span className="text-zinc-550">{count} items ({Math.round(percentage)}%)</span>
+                            <div key={cat} className="space-y-1.5">
+                              <div className="flex justify-between text-xs font-bold">
+                                <span className="text-[var(--text-primary)]">{cat}</span>
+                                <span className="text-[var(--text-secondary)]">{count} items ({Math.round(percentage)}%)</span>
                               </div>
-                              <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-teal-400 h-1.5" style={{ width: `${percentage}%` }}></div>
+                              <div className="w-full bg-[var(--bg-card-secondary)] rounded-full h-2 overflow-hidden shadow-inner">
+                                <div className="bg-[var(--accent-sage)] h-2 rounded-full" style={{ width: `${percentage}%` }}></div>
                               </div>
                             </div>
                           );
@@ -2748,27 +2755,27 @@ export default function Home() {
                     </div>
 
                     {/* Gap finder */}
-                    <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
-                      <h3 className="text-sm font-bold text-white">🔍 Gap & Overindexing Analysis</h3>
-                      <div className="space-y-3 text-xs leading-relaxed text-zinc-350 font-medium">
+                    <div className="border border-[#EAE5D9] bg-white rounded-3xl p-5 space-y-4 tactile-shadow-sm">
+                      <h3 className="text-sm font-extrabold text-[var(--text-primary)]">🔍 Gap & Overindexing Analysis</h3>
+                      <div className="space-y-3 text-xs leading-relaxed text-[var(--text-primary)] font-medium">
                         {items.filter(i => i.category === 'Footwear').length === 0 ? (
-                          <div className="border border-rose-500/10 bg-rose-500/5 rounded-xl p-3 text-rose-400">
-                            <strong>⚠️ Footwear Gap</strong>: You have no footwear registered! Trousers need shoes to complete silouhettes. Register calfskin loafers or canvas sneakers.
+                          <div className="border-l-4 border-[var(--accent-terracotta)] bg-[var(--bg-card-secondary)] rounded-r-xl p-3.5 text-[var(--text-primary)]">
+                            <strong className="text-[var(--accent-terracotta)] font-black">⚠️ Footwear Gap</strong>: You have no footwear registered! Trousers need shoes to complete silouhettes. Register calfskin loafers or canvas sneakers.
                           </div>
                         ) : null}
                         {items.filter(i => i.category === 'Tailoring').length === 0 ? (
-                          <div className="border border-amber-500/10 bg-amber-500/5 rounded-xl p-3 text-amber-400">
-                            <strong>💡 Tailoring Gap</strong>: No tailoring curated. Consider adding a charcoal blazer to elevate casual bottom coordinates.
+                          <div className="border-l-4 border-[var(--accent-apricot)] bg-[var(--bg-card-secondary)] rounded-r-xl p-3.5 text-[var(--text-primary)]">
+                            <strong className="text-[var(--accent-apricot)] font-black">💡 Tailoring Gap</strong>: No tailoring curated. Consider adding a charcoal blazer to elevate casual bottom coordinates.
                           </div>
                         ) : null}
                         {items.filter(i => i.category === 'Tops').length > 10 ? (
-                          <div className="border border-teal-500/10 bg-teal-500/5 rounded-xl p-3 text-teal-400">
-                            <strong>📈 Overindexed on Tops</strong>: You have {items.filter(i => i.category === 'Tops').length} tops. Focus on coordinating bottoms and outerwear layers to maximize wear combinations.
+                          <div className="border-l-4 border-[var(--accent-sage)] bg-[var(--bg-card-secondary)] rounded-r-xl p-3.5 text-[var(--text-primary)]">
+                            <strong className="text-[var(--accent-sage)] font-black">📈 Overindexed on Tops</strong>: You have {items.filter(i => i.category === 'Tops').length} tops. Focus on coordinating bottoms and outerwear layers to maximize wear combinations.
                           </div>
                         ) : null}
-                        <div className="bg-zinc-950/40 border border-zinc-850 rounded-xl p-3.5 space-y-1.5">
-                          <span className="text-[9px] uppercase font-black tracking-wider text-teal-400">Closet Balance Index</span>
-                          <p className="text-zinc-400 leading-relaxed">
+                        <div className="bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl p-4 space-y-1.5 shadow-xs">
+                          <span className="text-[9px] uppercase font-black tracking-wider text-[var(--accent-terracotta)]">Closet Balance Index</span>
+                          <p className="text-[var(--text-secondary)] leading-relaxed font-bold">
                             Your wardrobe ratio is <strong>{Math.round((items.filter(i => i.category === 'Tops').length / Math.max(items.filter(i => i.category === 'Bottoms').length, 1)) * 10) / 10} Tops to 1 Bottom</strong>. An optimal ratio is 3:1 to prevent styling fatigue.
                           </p>
                         </div>
@@ -2777,22 +2784,22 @@ export default function Home() {
                   </div>
 
                   {/* COLOR HARMONY PANEL */}
-                  <div className="border border-zinc-800 bg-[#1f2833]/15 rounded-2xl p-5 space-y-4">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <div className="border border-[#EAE5D9] bg-white rounded-3xl p-5 space-y-4 tactile-shadow-sm">
+                    <h3 className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-2">
                       <span>🎨 Tonal Harmony & Color Palette Analysis</span>
                     </h3>
-                    <p className="text-zinc-400 text-xs">
+                    <p className="text-[var(--text-secondary)] text-xs font-semibold">
                       Evaluating color wheel pairings, tonal contrast distribution, and classic menswear formulas using your active closet.
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       
                       {/* Dominant Swatches */}
-                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-teal-400">Dominant Wardrobe Swatches</span>
+                      <div className="p-4 bg-[var(--bg-card-secondary)]/50 border border-[#EAE5D9] rounded-2xl space-y-3.5">
+                        <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)] tracking-wider">Dominant Wardrobe Swatches</span>
                         <div className="flex flex-wrap gap-2.5">
                           {items.length === 0 ? (
-                            <span className="text-zinc-500 text-xs">No garments registered yet.</span>
+                            <span className="text-[var(--text-secondary)] text-xs">No garments registered yet.</span>
                           ) : (
                             Object.entries(
                               items.reduce((acc: Record<string, { count: number; hex?: string }>, item) => {
@@ -2806,15 +2813,15 @@ export default function Home() {
                               .sort((a, b) => b[1].count - a[1].count)
                               .slice(0, 6)
                               .map(([color, data]) => (
-                                <div key={color} className="flex items-center gap-2 bg-zinc-950/40 border border-zinc-850 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300">
+                                <div key={color} className="flex items-center gap-2.5 bg-white border border-[#EAE5D9] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] shadow-xs transition-transform duration-200 hover:-translate-y-0.5">
                                   <span 
-                                    className="w-3.5 h-3.5 rounded-full border border-zinc-800 shrink-0" 
+                                    className="w-4 h-4 rounded-full border border-[#DCD1C0] shrink-0" 
                                     style={{ backgroundColor: data.hex || '#333' }}
                                     title={color}
                                   />
                                   <div className="flex flex-col">
-                                    <span className="font-bold text-white truncate max-w-[60px] text-[10px]">{color}</span>
-                                    <span className="text-[8px] text-zinc-500">{data.count} items</span>
+                                    <span className="font-extrabold text-[var(--text-primary)] truncate max-w-[70px] text-[10px]">{color}</span>
+                                    <span className="text-[8px] text-[var(--text-secondary)] font-bold">{data.count} items</span>
                                   </div>
                                 </div>
                               ))
@@ -2823,10 +2830,10 @@ export default function Home() {
                       </div>
 
                       {/* Tonal Contrast Balance */}
-                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-indigo-400">Contrast Distribution</span>
+                      <div className="p-4 bg-[var(--bg-card-secondary)]/50 border border-[#EAE5D9] rounded-2xl space-y-3.5">
+                        <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)] tracking-wider">Contrast Distribution</span>
                         {items.length === 0 ? (
-                          <span className="text-zinc-555 text-xs">No contrast data.</span>
+                          <span className="text-[var(--text-secondary)] text-xs">No contrast data.</span>
                         ) : (() => {
                           const light = items.filter(i => i.tonal_value?.toLowerCase() === 'light').length;
                           const medium = items.filter(i => i.tonal_value?.toLowerCase() === 'medium').length;
@@ -2846,17 +2853,17 @@ export default function Home() {
 
                           return (
                             <div className="space-y-3">
-                              <div className="flex h-3 rounded-full overflow-hidden w-full border border-zinc-800 bg-zinc-900">
-                                <div className="bg-zinc-100 animate-pulse" style={{ width: `${pLight}%` }} title={`Light: ${pLight}%`} />
-                                <div className="bg-zinc-400" style={{ width: `${pMedium}%` }} title={`Medium: ${pMedium}%`} />
-                                <div className="bg-zinc-800" style={{ width: `${pDark}%` }} title={`Dark: ${pDark}%`} />
+                              <div className="flex h-3 rounded-full overflow-hidden w-full border border-[#EAE5D9] bg-white shadow-inner">
+                                <div className="bg-[#FAF9F6]" style={{ width: `${pLight}%` }} title={`Light: ${pLight}%`} />
+                                <div className="bg-[var(--bg-sidebar)]" style={{ width: `${pMedium}%` }} title={`Medium: ${pMedium}%`} />
+                                <div className="bg-[var(--text-primary)]" style={{ width: `${pDark}%` }} title={`Dark: ${pDark}%`} />
                               </div>
-                              <div className="flex justify-between text-[9px] text-zinc-500 font-bold">
+                              <div className="flex justify-between text-[9px] text-[var(--text-secondary)] font-bold">
                                 <span>Light: {pLight}%</span>
                                 <span>Medium: {pMedium}%</span>
                                 <span>Dark: {pDark}%</span>
                               </div>
-                              <p className="text-[10px] text-zinc-400 leading-relaxed font-medium">
+                              <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed font-bold">
                                 {advice}
                               </p>
                             </div>
@@ -2865,10 +2872,10 @@ export default function Home() {
                       </div>
 
                       {/* Classic Formulas */}
-                      <div className="p-4 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-amber-400">Color Formulas Checklist</span>
+                      <div className="p-4 bg-[var(--bg-card-secondary)]/50 border border-[#EAE5D9] rounded-2xl space-y-3.5">
+                        <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)] tracking-wider">Color Formulas Checklist</span>
                         {items.length === 0 ? (
-                          <span className="text-zinc-555 text-xs">Awaiting inventory.</span>
+                          <span className="text-[var(--text-secondary)] text-xs">Awaiting inventory.</span>
                         ) : (() => {
                           const families = items.map(i => (i.color_family || '').toLowerCase());
                           
