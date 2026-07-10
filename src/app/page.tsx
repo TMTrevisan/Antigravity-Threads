@@ -635,17 +635,22 @@ export default function Home() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['ID', 'Brand', 'Category', 'Sub-Category', 'Color Family', 'Fabric Blend', 'Fit Block', 'Purchase Price', 'Purchase Year'];
+    const headers = ['ID', 'Brand', 'Category', 'Sub-Category', 'Color Family', 'Hex Code', 'Tonal Value', 'Fabric Blend', 'Fit Block', 'Sleeve / Detail', 'Purchase Price', 'Purchase Year', 'Wears Count', 'Notes'];
     const rows = items.map(i => [
       i.id,
       i.brand || '',
       i.category,
       i.sub_category,
       i.color_family,
+      i.hex_code || '',
+      i.tonal_value || '',
       i.fabric_type || '',
       i.fit_block || '',
+      i.style_detail || '',
       i.price || 0,
-      i.purchase_year || ''
+      i.purchase_year || '',
+      getItemWornCount(i.id),
+      i.notes || ''
     ]);
     const csvContent = "data:text/csv;charset=utf-8," 
       + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
@@ -2854,8 +2859,20 @@ export default function Home() {
                               </div>
 
                               {outfit.styling_reasoning && (
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-semibold">{outfit.styling_reasoning}</p>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-3.5 font-semibold">{outfit.styling_reasoning}</p>
                               )}
+
+                              <button
+                                type="button"
+                                onClick={() => setVisualModal({
+                                  outfitName: outfit.name,
+                                  items: outfitItems,
+                                  tab: 'collage'
+                                })}
+                                className="w-full py-2.5 bg-[#FAF8F5] text-[var(--accent-terracotta)] border border-[#EAE5D9] hover:bg-[#F5F2EB] rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5"
+                              >
+                                🎨 View Outfit Visuals
+                              </button>
                             </div>
                           </div>
                         );
@@ -4910,7 +4927,18 @@ export default function Home() {
                   {/* Curation Actions + Wear History */}
                   <div className="space-y-2 border-t border-[#EAE5D9] pt-2.5">
                     <div className="flex gap-2 items-center justify-between text-xs text-[var(--text-secondary)]">
-                      <span className="text-[10px] uppercase font-bold">Wear History</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Prefill stylist input with garment details and switch tab
+                          setLookbookInput(`Built around: ${editingItem.brand || ''} ${editingItem.color_family} ${editingItem.sub_category}`.trim());
+                          setActiveTab('stylist');
+                          setEditingItem(null);
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/20 hover:bg-[var(--accent-terracotta)]/20 font-black text-[10px] uppercase tracking-wider transition active:scale-95"
+                      >
+                        ⚡ Build Outfit Around Item
+                      </button>
                       <div className="flex items-center gap-2">
                         <span className="text-[var(--text-primary)] font-extrabold">{getItemWornCount(editingItem.id)}x total</span>
                         <button

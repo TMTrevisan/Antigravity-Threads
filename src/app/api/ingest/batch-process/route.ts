@@ -85,10 +85,10 @@ export async function POST(request: Request) {
         `;
 
         const response = await ai.models.generateContent({
-          model: 'gemini-flash-latest',
+          model: 'gemini-2.5-flash-lite',
           contents: [
             ...imageParts,
-            promptText,
+            { text: promptText },
           ],
           config: {
             responseMimeType: 'application/json',
