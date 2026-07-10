@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 
 // GET all saved outfits
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data: outfits, error } = await supabase
+    const client = getSupabaseClient(request);
+    const { data: outfits, error } = await client
       .from('saved_outfits')
       .select('*')
       .order('created_at', { ascending: false });
@@ -28,7 +29,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Name and item_ids array are required.' }, { status: 400 });
     }
 
-    const { data: outfit, error } = await supabase
+    const client = getSupabaseClient(request);
+    const { data: outfit, error } = await client
       .from('saved_outfits')
       .insert([
         {
@@ -60,7 +62,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Outfit ID is required.' }, { status: 400 });
     }
 
-    const { error } = await supabase
+    const client = getSupabaseClient(request);
+    const { error } = await client
       .from('saved_outfits')
       .delete()
       .eq('id', id);

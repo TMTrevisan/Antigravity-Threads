@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import AuthGate from '@/components/AuthGate';
 
 interface GarmentImage {
   id: string;
@@ -1274,71 +1275,83 @@ export default function Home() {
   });
 
   return (
-    <div className="flex-1 flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] min-h-screen">
-      
-      {/* HIDDEN FILE INPUT FOR DETAIL IMAGES */}
-      <input 
-        ref={detailFilePickerRef}
-        type="file" 
-        multiple
-        accept="image/*"
-        onChange={(e) => handleDetailFilesSelected(e.target.files)}
-        className="hidden"
-      />
+    <AuthGate>
+      <div className="flex-1 flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] min-h-screen">
+        
+        {/* HIDDEN FILE INPUT FOR DETAIL IMAGES */}
+        <input 
+          ref={detailFilePickerRef}
+          type="file" 
+          multiple
+          accept="image/*"
+          onChange={(e) => handleDetailFilesSelected(e.target.files)}
+          className="hidden"
+        />
 
-      {/* HIDDEN CAMERA INPUTS */}
-      <input 
-        ref={cameraInputRef}
-        type="file" 
-        accept="image/*"
-        capture="environment"
-        onChange={(e) => {
-          if (e.target.files) {
-            handleFilesSelected(e.target.files, true);
-            e.target.value = '';
-          }
-        }}
-        className="hidden"
-      />
-      <input 
-        ref={detailCameraInputRef}
-        type="file" 
-        accept="image/*"
-        capture="environment"
-        onChange={(e) => {
-          if (e.target.files) {
-            handleDetailFilesSelected(e.target.files);
-            e.target.value = '';
-          }
-        }}
-        className="hidden"
-      />
+        {/* HIDDEN CAMERA INPUTS */}
+        <input 
+          ref={cameraInputRef}
+          type="file" 
+          accept="image/*"
+          capture="environment"
+          onChange={(e) => {
+            if (e.target.files) {
+              handleFilesSelected(e.target.files, true);
+              e.target.value = '';
+            }
+          }}
+          className="hidden"
+        />
+        <input 
+          ref={detailCameraInputRef}
+          type="file" 
+          accept="image/*"
+          capture="environment"
+          onChange={(e) => {
+            if (e.target.files) {
+              handleDetailFilesSelected(e.target.files);
+              e.target.value = '';
+            }
+          }}
+          className="hidden"
+        />
 
-      {/* HEADER */}
-      <header className="sticky top-0 z-45 bg-[var(--bg-main)]/95 backdrop-blur-md border-b border-[#EAE5D9] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[var(--bg-card-primary)] border border-[#EAE5D9] flex items-center justify-center overflow-hidden shadow-inner p-1">
-            <img src="/icon-192.png" alt="Antigravity Logo" className="w-full h-full object-contain" />
+        {/* HEADER */}
+        <header className="sticky top-0 z-45 bg-[var(--bg-main)]/95 backdrop-blur-md border-b border-[#EAE5D9] px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[var(--bg-card-primary)] border border-[#EAE5D9] flex items-center justify-center overflow-hidden shadow-inner p-1">
+              <img src="/icon-192.png" alt="Antigravity Logo" className="w-full h-full object-contain" />
+            </div>
+            <div>
+              <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+                <span className="embroidered-logo">Antigravity Threads</span>
+                <span className="text-[10px] bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/25 px-2 py-0.5 rounded-full font-bold">v2.31.0</span>
+              </h1>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-              <span className="embroidered-logo">Antigravity Threads</span>
-              <span className="text-[10px] bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/25 px-2 py-0.5 rounded-full font-bold">v2.31.0</span>
-            </h1>
+          <div className="flex items-center gap-2.5">
+            {telemetry && (
+              <button 
+                onClick={() => {
+                  setShowTelemetry(!showTelemetry);
+                  if (!showTelemetry) fetchTelemetry();
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-full bg-[var(--bg-card-primary)] border border-[#EAE5D9] text-[var(--text-secondary)] hover:bg-[var(--bg-card-secondary)] transition tactile-shadow-sm"
+              >
+                📉 Cost Metrics: ${telemetry.totalCost}
+              </button>
+            )}
+            <button
+              onClick={async () => {
+                const { supabase } = await import('@/lib/supabase');
+                await supabase.auth.signOut();
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-full bg-rose-50 border border-rose-150 text-rose-600 hover:bg-rose-100/70 transition tactile-shadow-sm"
+            >
+              🔒 Sign Out
+            </button>
           </div>
-        </div>
-        {telemetry && (
-          <button 
-            onClick={() => {
-              setShowTelemetry(!showTelemetry);
-              if (!showTelemetry) fetchTelemetry();
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-full bg-[var(--bg-card-primary)] border border-[#EAE5D9] text-[var(--text-secondary)] hover:bg-[var(--bg-card-secondary)] transition tactile-shadow-sm"
-          >
-            📉 Cost Metrics: ${telemetry.totalCost}
-          </button>
-        )}
-      </header>
+        </header>
 
       {/* CORE WORKSPACE */}
       <main className={`flex-1 flex flex-col lg:flex-row w-full mx-auto p-4 sm:p-6 gap-6 mb-24 lg:mb-0 ${
@@ -4925,6 +4938,7 @@ export default function Home() {
           </form>
         </div>
       )}
-    </div>
+      </div>
+    </AuthGate>
   );
 }

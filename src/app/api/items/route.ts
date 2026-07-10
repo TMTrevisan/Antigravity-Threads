@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 
 // GET all items joined with their garment_images
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data: items, error } = await supabase
+    const client = getSupabaseClient(request);
+    const { data: items, error } = await client
       .from('garments')
       .select('*, garment_images(*)')
       .order('created_at', { ascending: false });
@@ -39,8 +40,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Item ID is required.' }, { status: 400 });
     }
 
+    const client = getSupabaseClient(request);
     // 1. Update core garment data (with updated_at timestamp)
-    const { data: updatedItem, error } = await supabase
+    const { data: updatedItem, error } = await client
       .from('garments')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
@@ -52,7 +54,7 @@ export async function PATCH(request: Request) {
     }
 
     // 2. Query related images to return in updated state
-    const { data: garmentImages } = await supabase
+    const { data: garmentImages } = await client
       .from('garment_images')
       .select('*')
       .eq('garment_id', id);
@@ -83,8 +85,9 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Item ID is required.' }, { status: 400 });
     }
 
+    const client = getSupabaseClient(request);
     // 1. Fetch all associated garment images
-    const { data: images, error: fetchError } = await supabase
+    const { data: images, error: fetchError } = await client
       .from('garment_images')
       .select('storage_path')
       .eq('garment_id', id);
@@ -103,7 +106,7 @@ export async function DELETE(request: Request) {
         .filter((path): path is string => !!path);
 
       if (storagePaths.length > 0) {
-        const { error: storageError } = await supabase.storage
+        const { error: storageError } = await client.storage
           .from('wardrobe-images')
           .remove(storagePaths);
         
@@ -115,15 +118,15 @@ export async function DELETE(request: Request) {
 
     // 3. Clean up referencing saved outfits to prevent foreign key mismatch or layout crashes
     try {
-      const { data: outfits } = await supabase.from('saved_outfits').select('id, item_ids');
+      const { data: outfits } = await client.from('saved_outfits').select('id, item_ids');
       if (outfits && outfits.length > 0) {
         for (const outfit of outfits) {
           if (Array.isArray(outfit.item_ids) && outfit.item_ids.includes(id)) {
             const updatedIds = outfit.item_ids.filter((itemId: string) => itemId !== id);
             if (updatedIds.length === 0) {
-              await supabase.from('saved_outfits').delete().eq('id', outfit.id);
+              await client.from('saved_outfits').delete().eq('id', outfit.id);
             } else {
-              await supabase
+              await client
                 .from('saved_outfits')
                 .update({ item_ids: updatedIds })
                 .eq('id', outfit.id);
@@ -136,7 +139,7 @@ export async function DELETE(request: Request) {
     }
 
     // 4. Delete row from database (Cascades deletion to garment_images due to foreign key constraint)
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await client
       .from('garments')
       .delete()
       .eq('id', id);

@@ -9,3 +9,22 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_A
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Dynamically generate Supabase client using Request headers/Authorization bearer token for secure multi-user session scoping
+export function getSupabaseClient(request?: Request) {
+  if (!request) return supabase;
+  
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    });
+  }
+  
+  return supabase;
+}

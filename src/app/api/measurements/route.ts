@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data: measurements, error } = await supabase
+    const client = getSupabaseClient(request);
+    const { data: measurements, error } = await client
       .from('user_measurements')
       .select('*')
       .order('created_at', { ascending: false });
@@ -24,7 +25,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Label and type are required.' }, { status: 400 });
     }
 
-    const { data: measurement, error } = await supabase
+    const client = getSupabaseClient(request);
+    const { data: measurement, error } = await client
       .from('user_measurements')
       .insert([{ label, measurement_type, details: details || {} }])
       .select()
@@ -46,7 +48,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID is required.' }, { status: 400 });
     }
 
-    const { error } = await supabase
+    const client = getSupabaseClient(request);
+    const { error } = await client
       .from('user_measurements')
       .delete()
       .eq('id', id);

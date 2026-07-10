@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const client = getSupabaseClient(request);
     // 1. Fetch all records from billing_and_token_ledger
-    const { data: ledger, error } = await supabase
+    const { data: ledger, error } = await client
       .from('billing_and_token_ledger')
       .select('*')
       .order('timestamp', { ascending: false });
