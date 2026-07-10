@@ -134,7 +134,7 @@ export default function Home() {
   const [searchQueryText, setSearchQueryText] = useState('');
   const [isMergingGarments, setIsMergingGarments] = useState(false);
   const [mergeTargetGarmentId, setMergeTargetGarmentId] = useState('');
-  const [gridColumns, setGridColumns] = useState<1 | 2 | 3>(3);
+  const [gridColumns, setGridColumns] = useState<1 | 2 | 3 | 4>(3);
 
   useEffect(() => {
     if (editingItem) {
@@ -2543,11 +2543,11 @@ export default function Home() {
 
                       {viewMode === 'grid' && (
                         <div className="flex rounded-xl bg-[#F5F2EB] p-1 border border-[#EAE5D9]">
-                          {[1, 2, 3].map((num) => (
+                          {[1, 2, 3, 4].map((num) => (
                             <button
                               key={num}
                               type="button"
-                              onClick={() => setGridColumns(num as 1 | 2 | 3)}
+                              onClick={() => setGridColumns(num as 1 | 2 | 3 | 4)}
                               className={`p-1.5 px-2.5 rounded-lg text-[10px] uppercase font-black transition ${gridColumns === num ? 'bg-[var(--accent-sage)] text-white' : 'text-[var(--text-secondary)]'}`}
                             >
                               {num} Col
@@ -2571,7 +2571,9 @@ export default function Home() {
                         ? 'grid-cols-1' 
                         : gridColumns === 2 
                         ? 'grid-cols-1 sm:grid-cols-2' 
-                        : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                        : gridColumns === 3
+                        ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                        : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
                     }`}>
                       {filteredItems.map((item) => (
                         <div 
