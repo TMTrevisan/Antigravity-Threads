@@ -72,12 +72,7 @@ export async function POST(request: Request) {
           Classify the item under these rules:
           - Category: Must be exactly one of: 'Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Tailoring'.
           - Sub-Category: Specify the clothing sub-type (e.g., T-Shirt, Chinos, Shorts, Chelsea Boots, Bomber Jacket, Blazer, Sneaker, Oxford). Use 'Shorts' for short pants, and include sleeve length details ('Short Sleeve T-Shirt', 'Long Sleeve Shirt', 'Outer Layer Jacket') if categorizing tops.
-          - Style Detail: The single most specific style descriptor for this garment. Examples:
-              Tops → 'Long Sleeve', 'Short Sleeve', 'Sleeveless', '3/4 Sleeve', 'Polo', 'Henley', 'Crew Neck', 'V-Neck', 'Button-Down Collar'
-              Bottoms → 'Shorts', 'Straight Leg', 'Slim Leg', 'Wide Leg', 'Tapered', 'Cropped', 'Cargo', 'Pleated'
-              Outerwear → 'Single Breasted', 'Double Breasted', 'Hooded', 'Quilted', 'Zip-Up'
-              Footwear → 'Oxford', 'Derby', 'Chelsea Boot', 'Chukka', 'Loafer', 'Sneaker', 'Slip-On'
-              Tailoring → 'Single Breasted', 'Double Breasted', 'Peak Lapel', 'Notch Lapel'
+          - Style Detail: Write a precise style description specifying style characteristics, fit traits, and cuts. For shoes, always specify the height cut ('Low-Top', 'High-Top', 'Mid-Top') or closure style. For tops/outerwear, include neck/collar lines, pocket placements, and cuffs. Be as detailed as possible to make this highly descriptive for styling algorithms.
           - Color Family: The dominant color name.
           - Hex Code: Nearest hex code swatch representing the color, e.g. #002060.
           - Tonal Value: Must be exactly one of: 'Light', 'Medium', 'Dark'.

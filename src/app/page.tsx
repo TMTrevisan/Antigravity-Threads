@@ -132,6 +132,8 @@ export default function Home() {
   const [isReplacingImage, setIsReplacingImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [searchQueryText, setSearchQueryText] = useState('');
+  const [isMergingGarments, setIsMergingGarments] = useState(false);
+  const [mergeTargetGarmentId, setMergeTargetGarmentId] = useState('');
 
   useEffect(() => {
     if (editingItem) {
@@ -227,6 +229,47 @@ export default function Home() {
       alert(`Error uploading image: ${err.message}`);
     } finally {
       setIsUploadingImage(false);
+    }
+  };
+
+  const handleMergeGarments = async () => {
+    if (!editingItem || !mergeTargetGarmentId) return;
+    if (editingItem.id === mergeTargetGarmentId) {
+      alert('Cannot merge a garment into itself.');
+      return;
+    }
+    const targetItem = items.find(i => i.id === mergeTargetGarmentId);
+    if (!targetItem) {
+      alert('Target garment not found.');
+      return;
+    }
+    if (!confirm(`Are you sure you want to merge this garment (${editingItem.brand || 'Unknown'} ${editingItem.sub_category}) into ${targetItem.brand || 'Unknown'} ${targetItem.sub_category}? This will migrate all photos, wear counts, and outfit pairings, and then permanently delete this current garment.`)) {
+      return;
+    }
+    
+    setIsMergingGarments(true);
+    try {
+      const res = await fetch('/api/items/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceGarmentId: editingItem.id,
+          targetGarmentId: mergeTargetGarmentId
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Garments merged successfully!');
+        setEditingItem(null);
+        setMergeTargetGarmentId('');
+        await fetchItems();
+      } else {
+        alert(`Merge failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      alert(`Error during merge: ${err.message}`);
+    } finally {
+      setIsMergingGarments(false);
     }
   };
 
@@ -1602,6 +1645,26 @@ export default function Home() {
                         ))}
                       </div>
 
+                      {/* Bottom twin upload actions for quick access after scrolling */}
+                      <div className="flex gap-3 py-3 border-t border-b border-[#EAE5D9] bg-stone-50/50 p-4 rounded-2xl select-none">
+                        <button
+                          type="button"
+                          style={{ minHeight: '44px' }}
+                          onClick={() => cameraInputRef.current?.click()}
+                          className="flex-1 py-3 text-xs font-black bg-[var(--accent-terracotta)] text-white rounded-full active:scale-[0.98] transition shadow-md flex items-center justify-center gap-1.5 hover:bg-[var(--accent-terracotta)]/90"
+                        >
+                          📸 Take Photo
+                        </button>
+                        <button
+                          type="button"
+                          style={{ minHeight: '44px' }}
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex-1 py-3 text-xs font-bold bg-[var(--accent-sage)] text-white rounded-full active:scale-[0.98] transition shadow-md flex items-center justify-center gap-1.5 hover:bg-[var(--accent-sage)]/90"
+                        >
+                          📁 Choose Files
+                        </button>
+                      </div>
+
                       <button
                         onClick={triggerBatchUpload}
                         disabled={isProcessingBatch}
@@ -2721,6 +2784,27 @@ export default function Home() {
                                 ))}
                               </div>
 
+                              {/* Detailed item links inside Saved Outfits list card views */}
+                              <div className="space-y-1 bg-[#FAF8F5] border border-[#EAE5D9] p-3 rounded-2xl mb-3">
+                                <p className="text-[9px] uppercase font-black tracking-widest text-[var(--text-secondary)] mb-1.5 select-none">Outfit Constituents</p>
+                                {outfitItems.map(oi => (
+                                  <div 
+                                    key={oi.id}
+                                    onClick={() => setEditingItem(oi)}
+                                    className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-stone-100 transition cursor-pointer select-none"
+                                  >
+                                    <span className="font-extrabold text-[var(--text-primary)] hover:underline flex items-center gap-1.5">
+                                      <span 
+                                        className="w-2.5 h-2.5 rounded-full border border-stone-300 inline-block shadow-inner shrink-0" 
+                                        style={{ backgroundColor: oi.hex_code || '#ddd' }}
+                                      />
+                                      {oi.brand ? `${oi.brand} ` : ''}{oi.sub_category}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-[var(--accent-terracotta)] uppercase shrink-0">edit ↗</span>
+                                  </div>
+                                ))}
+                              </div>
+
                               {outfit.styling_reasoning && (
                                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-semibold">{outfit.styling_reasoning}</p>
                               )}
@@ -3530,13 +3614,53 @@ export default function Home() {
 
                   <div className="flex justify-between items-center pt-2">
                     <span className="text-xs text-[var(--accent-terracotta)] font-bold">{stylingError}</span>
-                    <button
-                      type="submit"
-                      disabled={isGenerating}
-                      className="px-5 py-3 rounded-full bg-[var(--accent-terracotta)] text-white font-extrabold text-xs hover:bg-[var(--accent-terracotta)]/90 transition shadow-md active:scale-95 duration-200"
-                    >
-                      {isGenerating ? 'Designing...' : 'Generate Outfits'}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const activeItems = items.filter(i => i.status === 'Active');
+                          const tops = activeItems.filter(i => i.category.toLowerCase() === 'tops');
+                          const bottoms = activeItems.filter(i => i.category.toLowerCase() === 'bottoms');
+                          const shoes = activeItems.filter(i => i.category.toLowerCase() === 'footwear');
+                          const layers = activeItems.filter(i => i.category.toLowerCase() === 'outerwear' || i.category.toLowerCase() === 'tailoring');
+                          
+                          if (tops.length === 0 || bottoms.length === 0) {
+                            alert('You need at least 1 top and 1 bottom active in your closet to generate outfits.');
+                            return;
+                          }
+                          
+                          const randomTop = tops[Math.floor(Math.random() * tops.length)];
+                          const randomBottom = bottoms[Math.floor(Math.random() * bottoms.length)];
+                          const randomShoe = shoes.length > 0 ? shoes[Math.floor(Math.random() * shoes.length)] : null;
+                          const randomLayer = layers.length > 0 && Math.random() > 0.4 ? layers[Math.floor(Math.random() * layers.length)] : null;
+                          
+                          const ids = [randomTop.id, randomBottom.id];
+                          if (randomShoe) ids.push(randomShoe.id);
+                          if (randomLayer) ids.push(randomLayer.id);
+                          
+                          setStylistResult({
+                            outfits: [{
+                              name: `🎲 Curated Shuffle Outfit`,
+                              item_ids: ids,
+                              styling_reasoning: `A spontaneous shuffle combination matching the ${randomTop.color_family} ${randomTop.sub_category} with ${randomBottom.color_family} ${randomBottom.sub_category}${randomShoe ? ` and ${randomShoe.brand || 'premium'} footwear` : ''}.`
+                            }],
+                            gap_analysis: 'No gaps analyzed during randomized shuffle.',
+                            general_tips: ['Play with proportions and texture contrasts by layering or tucking.']
+                          });
+                          setCurrentOutfitIdx(0);
+                        }}
+                        className="px-5 py-3 rounded-full bg-[var(--accent-sage)] text-white font-extrabold text-xs hover:bg-[var(--accent-sage)]/90 transition shadow-md active:scale-95 duration-200"
+                      >
+                        🎲 Shuffle Outfit
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isGenerating}
+                        className="px-5 py-3 rounded-full bg-[var(--accent-terracotta)] text-white font-extrabold text-xs hover:bg-[var(--accent-terracotta)]/90 transition shadow-md active:scale-95 duration-200"
+                      >
+                        {isGenerating ? 'Designing...' : 'Generate Outfits'}
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -3584,6 +3708,27 @@ export default function Home() {
                                       <p className="text-[8.5px] font-black text-[var(--text-primary)] truncate">{oi.brand ? `${oi.brand} ` : ''}{oi.sub_category}</p>
                                       <p className="text-[7.5px] font-bold text-[var(--text-secondary)] truncate lowercase">{oi.fabric_type || ''} • {oi.color_family}</p>
                                     </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Explicit details list of constituents with links to trigger editing */}
+                              <div className="space-y-1 bg-[#FAF8F5] border border-[#EAE5D9] p-3 rounded-2xl mb-3">
+                                <p className="text-[9px] uppercase font-black tracking-widest text-[var(--text-secondary)] mb-1.5 select-none">Outfit Items Curation</p>
+                                {outfitItems.map(oi => (
+                                  <div 
+                                    key={oi.id}
+                                    onClick={() => setEditingItem(oi)}
+                                    className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-stone-100 transition cursor-pointer select-none"
+                                  >
+                                    <span className="font-extrabold text-[var(--text-primary)] hover:underline flex items-center gap-1.5">
+                                      <span 
+                                        className="w-2.5 h-2.5 rounded-full border border-stone-300 inline-block shadow-inner shrink-0" 
+                                        style={{ backgroundColor: oi.hex_code || '#ddd' }}
+                                      />
+                                      {oi.brand ? `${oi.brand} ` : ''}{oi.sub_category}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-[var(--accent-terracotta)] uppercase shrink-0">edit ↗</span>
                                   </div>
                                 ))}
                               </div>
@@ -3717,6 +3862,26 @@ export default function Home() {
                                     <div className="p-1 bg-[#F5F2EB] border-t border-[#EAE5D9] text-center">
                                       <p className="text-[8px] font-black text-[var(--text-primary)] truncate">{oi.brand ? `${oi.brand} ` : ''}{oi.sub_category}</p>
                                     </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Detailed item links inside mobile card swiper view */}
+                              <div className="space-y-1 bg-[#FAF8F5] border border-[#EAE5D9] p-2.5 rounded-2xl">
+                                {outfitItems.map(oi => (
+                                  <div 
+                                    key={oi.id}
+                                    onClick={() => setEditingItem(oi)}
+                                    className="flex items-center justify-between text-[11px] py-1 px-1.5 rounded-lg active:bg-stone-100 transition cursor-pointer select-none"
+                                  >
+                                    <span className="font-extrabold text-[var(--text-primary)] active:underline flex items-center gap-1.5">
+                                      <span 
+                                        className="w-2.5 h-2.5 rounded-full border border-stone-300 inline-block shadow-inner shrink-0" 
+                                        style={{ backgroundColor: oi.hex_code || '#ddd' }}
+                                      />
+                                      {oi.brand ? `${oi.brand} ` : ''}{oi.sub_category}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-[var(--accent-terracotta)] uppercase shrink-0">edit ↗</span>
                                   </div>
                                 ))}
                               </div>
@@ -4402,8 +4567,29 @@ export default function Home() {
               <div className="space-y-4">
                 <div className="relative w-full aspect-square max-w-[280px] mx-auto rounded-2xl overflow-hidden border border-[#EAE5D9] bg-[#FBFBFA] flex flex-col items-center justify-center p-1.5 shadow-inner">
                   {editingItem.primary_image_url && (
-                    <img src={editingItem.primary_image_url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
+                    <img 
+                      src={editingItem.primary_image_url} 
+                      alt="" 
+                      className="object-contain w-full h-full mix-blend-multiply transition-transform duration-200" 
+                      style={{ transform: `rotate(${(editingItem as any).rotation || 0}deg)` }}
+                    />
                   )}
+                </div>
+                <div className="flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentRotation = (editingItem as any).rotation || 0;
+                      const nextRotation = (currentRotation + 90) % 360;
+                      setEditingItem({
+                        ...editingItem,
+                        rotation: nextRotation
+                      } as any);
+                    }}
+                    className="px-3 py-1.5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl text-[10px] font-black uppercase text-[var(--accent-terracotta)] hover:bg-[#F5F2EB] active:scale-95 transition"
+                  >
+                    🔄 Rotate Photo (90°)
+                  </button>
                 </div>
                 <div className="space-y-2">
                   <div className="flex gap-2">
@@ -4419,26 +4605,32 @@ export default function Home() {
                       onClick={async () => {
                         setIsSearchingImage(true);
                         setSearchResults(null);
-                        try {
-                          const q = encodeURIComponent(searchQueryText);
-                          const res = await fetch(`/api/items/search-image?query=${q}`);
-                          const data = await res.json();
-                          if (res.ok) {
-                            setSearchResults(data.results);
-                          } else {
-                            alert(`Search failed: ${data.error || 'Unknown error'}`);
+                          try {
+                            const res = await fetch('/api/items/search-image', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                brand: editingItem.brand || '',
+                                description: searchQueryText
+                              })
+                            });
+                            const data = await res.json();
+                            if (res.ok) {
+                              setSearchResults(data.images || []);
+                            } else {
+                              alert(`Search failed: ${data.error || 'Unknown error'}`);
+                            }
+                          } catch (err: any) {
+                            alert(`Search error: ${err.message}`);
+                          } finally {
+                            setIsSearchingImage(false);
                           }
-                        } catch (err: any) {
-                          alert(`Search error: ${err.message}`);
-                        } finally {
-                          setIsSearchingImage(false);
-                        }
-                      }}
-                      disabled={isSearchingImage}
-                      className="px-3 py-1.5 bg-[#FAF8F5] border border-[#EAE5D9] text-[var(--accent-terracotta)] rounded-xl text-xs font-black transition hover:bg-[#F5F2EB] active:scale-95 shrink-0"
-                    >
-                      {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
-                    </button>
+                        }}
+                        disabled={isSearchingImage}
+                        className="px-3 py-1.5 bg-[#FAF8F5] border border-[#EAE5D9] text-[var(--accent-terracotta)] rounded-xl text-xs font-black transition hover:bg-[#F5F2EB] active:scale-95 shrink-0"
+                      >
+                        {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
+                      </button>
                   </div>
 
                   {searchResults && (
@@ -4697,6 +4889,36 @@ export default function Home() {
                         </div>
                       </details>
                     )}
+                  </div>
+
+                  {/* Merge Garments Section */}
+                  <div className="space-y-2 border-t border-[#EAE5D9] pt-2.5">
+                    <span className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Merge with Another Garment</span>
+                    <div className="flex gap-2">
+                      <select
+                        value={mergeTargetGarmentId}
+                        onChange={(e) => setMergeTargetGarmentId(e.target.value)}
+                        className="flex-1 bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      >
+                        <option value="">-- Choose garment to merge into --</option>
+                        {items
+                          .filter(i => i.id !== editingItem.id)
+                          .sort((a, b) => (a.brand || '').localeCompare(b.brand || ''))
+                          .map(i => (
+                            <option key={i.id} value={i.id}>
+                              [{i.category}] {i.brand || 'Generic'} - {i.sub_category} ({i.color_family})
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleMergeGarments}
+                        disabled={!mergeTargetGarmentId || isMergingGarments}
+                        className="px-3.5 py-2 bg-[var(--accent-sage)] text-white hover:bg-[var(--accent-sage)]/90 disabled:bg-stone-100 disabled:text-stone-400 font-extrabold text-[10px] uppercase tracking-wider rounded-xl transition active:scale-95 shrink-0"
+                      >
+                        {isMergingGarments ? 'Merging...' : 'Merge ⎘'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
