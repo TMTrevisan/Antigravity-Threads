@@ -3641,10 +3641,15 @@ export default function Home() {
                         type="button"
                         onClick={() => {
                           const activeItems = items.filter(i => i.status === 'Active');
-                          const tops = activeItems.filter(i => i.category.toLowerCase() === 'tops');
-                          const bottoms = activeItems.filter(i => i.category.toLowerCase() === 'bottoms');
-                          const shoes = activeItems.filter(i => i.category.toLowerCase() === 'footwear');
-                          const layers = activeItems.filter(i => i.category.toLowerCase() === 'outerwear' || i.category.toLowerCase() === 'tailoring');
+                          
+                          // Categorize items case-insensitively
+                          const tops = activeItems.filter(i => (i.category || '').toLowerCase() === 'tops');
+                          const bottoms = activeItems.filter(i => (i.category || '').toLowerCase() === 'bottoms');
+                          const shoes = activeItems.filter(i => (i.category || '').toLowerCase() === 'footwear');
+                          const layers = activeItems.filter(i => {
+                            const cat = (i.category || '').toLowerCase();
+                            return cat === 'outerwear' || cat === 'tailoring';
+                          });
                           
                           if (tops.length === 0 || bottoms.length === 0) {
                             alert('You need at least 1 top and 1 bottom active in your closet to generate outfits.');
@@ -3656,6 +3661,7 @@ export default function Home() {
                           const randomShoe = shoes.length > 0 ? shoes[Math.floor(Math.random() * shoes.length)] : null;
                           const randomLayer = layers.length > 0 && Math.random() > 0.4 ? layers[Math.floor(Math.random() * layers.length)] : null;
                           
+                          // Ensure we have a top and a bottom, plus optionally shoes and layers
                           const ids = [randomTop.id, randomBottom.id];
                           if (randomShoe) ids.push(randomShoe.id);
                           if (randomLayer) ids.push(randomLayer.id);
@@ -3664,7 +3670,7 @@ export default function Home() {
                             outfits: [{
                               name: `🎲 Curated Shuffle Outfit`,
                               item_ids: ids,
-                              styling_reasoning: `A spontaneous shuffle combination matching the ${randomTop.color_family} ${randomTop.sub_category} with ${randomBottom.color_family} ${randomBottom.sub_category}${randomShoe ? ` and ${randomShoe.brand || 'premium'} footwear` : ''}.`
+                              styling_reasoning: `A spontaneous shuffle combination matching the ${randomTop.color_family} ${randomTop.sub_category} with the ${randomBottom.color_family} ${randomBottom.sub_category}${randomShoe ? ` and ${randomShoe.brand || 'premium'} footwear` : ''}.`
                             }],
                             gap_analysis: 'No gaps analyzed during randomized shuffle.',
                             general_tips: ['Play with proportions and texture contrasts by layering or tucking.']

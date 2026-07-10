@@ -50,7 +50,7 @@ export async function GET(request: Request) {
         totalCost: Number(totalCost.toFixed(6)),
         services,
       },
-      recentLogs: ledger.slice(0, 15),
+      recentLogs: ledger,
     });
   } catch (error: any) {
     console.error('Telemetry query error:', error);
