@@ -238,7 +238,7 @@ export async function POST(request: Request) {
                   const imageBlob = await imageResponse.blob();
                   const buffer = Buffer.from(await imageBlob.arrayBuffer());
 
-                  const hfRes = await fetch('https://router.huggingface.co/hf-inference/models/briaai/RMBG-1.4', {
+                  const hfRes = await fetch('https://api-inference.huggingface.co/models/briaai/RMBG-1.4', {
                     method: 'POST',
                     headers: {
                       'Authorization': `Bearer ${hfToken}`,
