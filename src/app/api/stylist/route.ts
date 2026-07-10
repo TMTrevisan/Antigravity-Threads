@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       3. Weather & Event: Align fits and fabrics (e.g. linen for heat, wool/layering for cold) with event formality.
       4. Complete Outfits: Combine a top and a bottom, plus outerwear/footwear if available. Refer to the items ONLY by their exact UUID from the list.
       
-      Suggest 2 to 3 distinct outfits. For each outfit, list the UUIDs of the items used.
+      Suggest 4 to 6 distinct outfits. For each outfit, list the UUIDs of the items used.
       Also list 2 specific wardrobe gaps (staples or colors missing) to achieve their lookbook style.
     `;
 
