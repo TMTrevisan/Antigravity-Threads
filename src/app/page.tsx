@@ -1901,6 +1901,33 @@ export default function Home() {
                           <button
                             type="button"
                             onClick={async () => {
+                              if (!validationTarget) return;
+                              setIsReplacingImage(true);
+                              try {
+                                const processRes = await fetch('/api/ingest/batch-process', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ ids: [validationTarget.id] }),
+                                });
+                                const processData = await processRes.json();
+                                if (!processRes.ok) throw new Error(processData.error || 'Ingestion re-processing failed');
+                                alert('Garment re-processed successfully!');
+                                await fetchItems();
+                                setValidationTarget(null);
+                              } catch (err: any) {
+                                alert(`Failed to re-process garment: ${err.message}`);
+                              } finally {
+                                setIsReplacingImage(false);
+                              }
+                            }}
+                            disabled={isReplacingImage}
+                            className="px-4 py-2 bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/20 hover:bg-[var(--accent-terracotta)]/20 rounded-full text-xs font-bold transition uppercase tracking-wider disabled:opacity-50"
+                          >
+                            🔄 Re-Process Garment
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
                               const primaryImg = validationTarget.images?.find((img: any) => img.is_primary_profile) || validationTarget.images?.[0] || { storage_path: validationTarget.primary_image_url };
                               if (!primaryImg || !primaryImg.storage_path) {
                                 alert('No image found for this garment.');
@@ -2566,15 +2593,12 @@ export default function Home() {
                       <p className="text-[var(--text-secondary)] text-xs">No matching garments found in your closet.</p>
                     </div>
                   ) : viewMode === 'grid' ? (
-                    <div className={`grid gap-5 ${
-                      gridColumns === 1 
-                        ? 'grid-cols-1' 
-                        : gridColumns === 2 
-                        ? 'grid-cols-1 sm:grid-cols-2' 
-                        : gridColumns === 3
-                        ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-                        : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
-                    }`}>
+                    <div 
+                      className="grid gap-5"
+                      style={{
+                        gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`
+                      }}
+                    >
                       {filteredItems.map((item) => (
                         <div 
                           key={item.id}
