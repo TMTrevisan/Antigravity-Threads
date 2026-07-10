@@ -1315,7 +1315,7 @@ export default function Home() {
           <div>
             <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
               <span className="embroidered-logo">Antigravity Threads</span>
-              <span className="text-[10px] bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/25 px-2 py-0.5 rounded-full font-bold">v2.7</span>
+              <span className="text-[10px] bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/25 px-2 py-0.5 rounded-full font-bold">v2.31.0</span>
             </h1>
           </div>
         </div>
@@ -2522,15 +2522,20 @@ export default function Home() {
                           </div>
 
                           <div className="p-3.5 space-y-1">
-                            <div className="flex items-center justify-between text-[8px] uppercase font-extrabold text-[var(--text-secondary)]">
-                              <div className="flex items-center gap-1">
-                                <span>{item.sub_category}</span>
+                            <div className="flex flex-col text-[8.5px] uppercase font-extrabold text-[var(--text-secondary)]">
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="bg-[#FAF8F5] border border-[#EAE5D9] px-1.5 py-0.5 rounded text-[8px] font-black text-[var(--text-primary)]">
+                                  {item.sub_category}
+                                </span>
                                 {item.style_detail && (
-                                  <span className="bg-[#FAF8F5] border border-[#EAE5D9] px-1 rounded text-[7px] text-[var(--accent-terracotta)] font-bold lowercase">
+                                  <span className="bg-[#FAF8F5] border border-[#EAE5D9] px-1.5 py-0.5 rounded text-[7.5px] text-[var(--accent-terracotta)] font-extrabold lowercase">
                                     {item.style_detail}
                                   </span>
                                 )}
                               </div>
+                            </div>
+                            <div className="flex justify-between items-center text-[8.5px] pt-1">
+                              <span className="text-[var(--text-secondary)] font-extrabold">{item.brand || 'Unbranded'}</span>
                               {getItemWornCount(item.id) > 0 && (
                                 <span className="text-[var(--accent-sage)] font-black">Worn {getItemWornCount(item.id)}x</span>
                               )}
@@ -4311,7 +4316,7 @@ export default function Home() {
                 await uploadImageToGarment(file);
               }
             }}
-            className="bg-white border border-[#EAE5D9] rounded-3xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto relative text-[var(--text-primary)] shadow-2xl shadow-stone-300"
+            className="bg-white border border-[#EAE5D9] rounded-3xl p-6 w-full max-w-4xl space-y-4 max-h-[90vh] overflow-y-auto relative text-[var(--text-primary)] shadow-2xl shadow-stone-300"
           >
             <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3">
               <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Edit Garment Curation</h3>
@@ -4337,344 +4342,312 @@ export default function Home() {
               } finally {
                 setIsSavingEdit(false);
               }
-            }} className="space-y-3">
+            }} className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              <div className="relative w-32 h-32 mx-auto rounded-2xl overflow-hidden border border-[#EAE5D9] bg-[#FBFBFA] flex flex-col items-center justify-center p-1.5 shadow-inner">
-                {editingItem.primary_image_url && (
-                  <img src={editingItem.primary_image_url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
-                )}
-              </div>
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={searchQueryText}
-                    onChange={(e) => setSearchQueryText(e.target.value)}
-                    placeholder="Search query (e.g. White Oxford Shirt)..."
-                    className="flex-1 bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40"
-                  />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setIsSearchingImage(true);
-                      setSearchResults(null);
-                      try {
-                        const q = encodeURIComponent(searchQueryText);
-                        const res = await fetch(`/api/items/search-image?query=${q}`);
-                        const data = await res.json();
-                        if (res.ok) {
-                          setSearchResults(data.results);
-                        } else {
-                          alert(`Search failed: ${data.error || 'Unknown error'}`);
-                        }
-                      } catch (err: any) {
-                        alert(`Search error: ${err.message}`);
-                      } finally {
-                        setIsSearchingImage(false);
-                      }
-                    }}
-                    disabled={isSearchingImage}
-                    className="px-3 py-1.5 bg-[#FAF8F5] border border-[#EAE5D9] text-[var(--accent-terracotta)] rounded-xl text-xs font-black transition hover:bg-[#F5F2EB] active:scale-95"
-                  >
-                    {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
-                  </button>
+              {/* Left Column: Image Management */}
+              <div className="space-y-4">
+                <div className="relative w-full aspect-square max-w-[280px] mx-auto rounded-2xl overflow-hidden border border-[#EAE5D9] bg-[#FBFBFA] flex flex-col items-center justify-center p-1.5 shadow-inner">
+                  {editingItem.primary_image_url && (
+                    <img src={editingItem.primary_image_url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
+                  )}
                 </div>
-
-                {searchResults && (
-                  <div className="border border-[#EAE5D9] bg-[#FAF8F5] rounded-2xl p-3.5 space-y-2.5">
-                    <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] font-extrabold uppercase">
-                      <span>Add Alternate/Gallery Photo</span>
-                      <button type="button" onClick={() => setSearchResults(null)} className="text-[var(--accent-terracotta)]">Close</button>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                      {searchResults.slice(0, 4).map((img: any, idx: number) => (
-                        <div
-                          key={idx}
-                          onClick={async () => {
-                            if (isReplacingImage) return;
-                            setIsReplacingImage(true);
-                            try {
-                              const res = await fetch('/api/items/search-image', {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  garmentId: editingItem.id,
-                                  imageUrl: img.url
-                                }),
-                              });
-                              const data = await res.json();
-                              if (res.ok) {
-                                setEditingItem({
-                                  ...editingItem,
-                                  images: data.images
-                                });
-                                await fetchItems();
-                                setSearchResults(null);
-                              } else {
-                                alert(`Failed to add photo: ${data.error || 'Unknown error'}`);
-                              }
-                            } catch (err: any) {
-                              alert(`Error replacing photo: ${err.message}`);
-                            } finally {
-                              setIsReplacingImage(false);
-                            }
-                          }}
-                          className="relative aspect-square border border-[#EAE5D9] rounded-xl overflow-hidden bg-white cursor-pointer hover:border-[var(--accent-terracotta)] transition group"
-                        >
-                          <img src={img.url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
-                          <div className="absolute inset-x-0 bottom-0 bg-white/80 text-[7px] text-[var(--text-secondary)] px-1 py-0.5 truncate text-center group-hover:text-[var(--accent-terracotta)] font-bold">
-                            {img.source}
-                          </div>
-                          {isReplacingImage && (
-                            <div className="absolute inset-0 bg-white/60 flex items-center justify-center text-[8px] text-[var(--accent-terracotta)] animate-pulse font-bold">
-                              Adding...
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Thumbnails list in editor */}
-              <div className="relative flex justify-center gap-1.5 overflow-x-auto py-1">
-                {isUploadingImage && (
-                  <div className="absolute inset-0 bg-white/60 z-30 flex items-center justify-center rounded-2xl">
-                    <div className="w-4 h-4 rounded-full border border-[var(--accent-terracotta)] border-t-transparent animate-spin"></div>
-                  </div>
-                )}
-                {editingItem.images.map((img: any) => (
-                  <div 
-                    key={img.id} 
-                    onClick={() => setPrimaryImage(img.id)}
-                    className={`relative w-9 h-9 border rounded-xl overflow-hidden bg-white shrink-0 cursor-pointer group transition ${
-                      img.is_primary_profile ? 'border-[var(--accent-terracotta)] ring-1 ring-[var(--accent-terracotta)]' : 'border-[#EAE5D9] hover:border-[#DCD1C0]'
-                    }`}
-                  >
-                    <img src={img.storage_path} alt="" className="object-contain w-full h-full mix-blend-multiply" />
-                    {!img.is_primary_profile && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteGarmentImage(img.id);
-                        }}
-                        className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-[var(--accent-terracotta)] hover:bg-[var(--accent-terracotta)]/85 rounded-full flex items-center justify-center text-[7px] text-white font-extrabold opacity-0 group-hover:opacity-100 transition"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Category</label>
-                  <select
-                    value={editingItem.category}
-                    onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  >
-                    <option value="Tops">Tops</option>
-                    <option value="Bottoms">Bottoms</option>
-                    <option value="Outerwear">Outerwear</option>
-                    <option value="Footwear">Footwear</option>
-                    <option value="Tailoring">Tailoring</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Status</label>
-                  <select
-                    value={editingItem.status}
-                    onChange={(e) => setEditingItem({ ...editingItem, status: e.target.value as any })}
-                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  >
-                    <option value="Active">Active Closet</option>
-                    <option value="Archive">Archive (Doesn't Fit)</option>
-                    <option value="Donate">Pending Donate</option>
-                    <option value="Discard">Discard / Sell</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Sub-Category</label>
-                  <input
-                    type="text"
-                    value={editingItem.sub_category}
-                    onChange={(e) => setEditingItem({ ...editingItem, sub_category: e.target.value })}
-                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Brand</label>
-                  <input
-                    type="text"
-                    value={editingItem.brand || ''}
-                    onChange={(e) => setEditingItem({ ...editingItem, brand: e.target.value || null })}
-                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Purchase Price ($)</label>
-                  <input
-                    type="number"
-                    value={editingItem.price || 0}
-                    onChange={(e) => setEditingItem({ ...editingItem, price: Number(e.target.value) })}
-                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Purchase Year</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 2026"
-                    value={editingItem.purchase_year || ''}
-                    onChange={(e) => setEditingItem({ ...editingItem, purchase_year: e.target.value ? Number(e.target.value) : null })}
-                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Fabric</label>
-                  <input
-                    type="text"
-                    value={editingItem.fabric_type || ''}
-                    onChange={(e) => setEditingItem({ ...editingItem, fabric_type: e.target.value || null })}
-                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Fit Block</label>
-                  <input
-                    type="text"
-                    value={editingItem.fit_block || ''}
-                    onChange={(e) => setEditingItem({ ...editingItem, fit_block: e.target.value || null })}
-                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Color Family</label>
-                  <input
-                    type="text"
-                    value={editingItem.color_family}
-                    onChange={(e) => setEditingItem({ ...editingItem, color_family: e.target.value })}
-                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Sleeve / Detail</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Long Sleeve, Short Sleeve"
-                    value={editingItem.style_detail || ''}
-                    onChange={(e) => setEditingItem({ ...editingItem, style_detail: e.target.value || null })}
-                    className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Notes Field */}
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">📝 Notes</label>
-                <textarea
-                  value={editingItem.notes || ''}
-                  onChange={(e) => setEditingItem({ ...editingItem, notes: e.target.value || null })}
-                  placeholder="Add personal notes, care instructions, styling ideas..."
-                  rows={3}
-                  className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2.5 text-xs text-[var(--text-primary)] resize-none focus:outline-none focus:border-[var(--accent-terracotta)]/40"
-                />
-              </div>
-
-              {/* Created / Updated dates */}
-              <div className="flex gap-3 text-[10px] text-[var(--text-secondary)]">
-                <span>Added: <span className="text-[var(--text-primary)] font-bold">{editingItem.created_at ? new Date(editingItem.created_at).toLocaleDateString() : '—'}</span></span>
-              </div>
-
-              {/* Curation Actions + Wear History */}
-              <div className="space-y-2 border-t border-[#EAE5D9] pt-2.5">
-                <div className="flex gap-2 items-center justify-between text-xs text-[var(--text-secondary)]">
-                  <span className="text-[10px] uppercase font-bold">Wear History</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[var(--text-primary)] font-extrabold">{getItemWornCount(editingItem.id)}x total</span>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={searchQueryText}
+                      onChange={(e) => setSearchQueryText(e.target.value)}
+                      placeholder="Search query (e.g. White Oxford Shirt)..."
+                      className="flex-1 bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40"
+                    />
                     <button
                       type="button"
-                      onClick={() => logGarmentWorn(editingItem.id)}
-                      className="px-3 py-1 rounded-lg bg-[var(--accent-terracotta)] text-white font-extrabold text-xs"
+                      onClick={async () => {
+                        setIsSearchingImage(true);
+                        setSearchResults(null);
+                        try {
+                          const q = encodeURIComponent(searchQueryText);
+                          const res = await fetch(`/api/items/search-image?query=${q}`);
+                          const data = await res.json();
+                          if (res.ok) {
+                            setSearchResults(data.results);
+                          } else {
+                            alert(`Search failed: ${data.error || 'Unknown error'}`);
+                          }
+                        } catch (err: any) {
+                          alert(`Search error: ${err.message}`);
+                        } finally {
+                          setIsSearchingImage(false);
+                        }
+                      }}
+                      disabled={isSearchingImage}
+                      className="px-3 py-1.5 bg-[#FAF8F5] border border-[#EAE5D9] text-[var(--accent-terracotta)] rounded-xl text-xs font-black transition hover:bg-[#F5F2EB] active:scale-95 shrink-0"
                     >
-                      + Log Wear
+                      {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
                     </button>
                   </div>
-                </div>
-                {/* Collapsible scrollable history */}
-                {wearLogs.filter(l => l.garment_id === editingItem.id).length > 0 && (
-                  <details className="group">
-                    <summary className="text-[10px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)] transition select-none list-none flex items-center gap-1 font-bold">
-                      <span className="group-open:hidden">▶</span>
-                      <span className="hidden group-open:inline">▼</span>
-                      {wearLogs.filter(l => l.garment_id === editingItem.id).length} wear entries
-                    </summary>
-                    <div className="mt-1.5 max-h-32 overflow-y-auto space-y-0.5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2.5">
-                      {wearLogs
-                        .filter(l => l.garment_id === editingItem.id)
-                        .sort((a, b) => new Date(b.worn_at).getTime() - new Date(a.worn_at).getTime())
-                        .map((log, idx) => (
-                          <div key={log.id} className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] py-0.5 border-b border-[#FAF8F5] last:border-0 font-semibold">
-                            <span>#{wearLogs.filter(l => l.garment_id === editingItem.id).length - idx}</span>
-                            <span>{new Date(log.worn_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+
+                  {searchResults && (
+                    <div className="border border-[#EAE5D9] bg-[#FAF8F5] rounded-2xl p-3.5 space-y-2.5">
+                      <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] font-extrabold uppercase">
+                        <span>Add Alternate/Gallery Photo</span>
+                        <button type="button" onClick={() => setSearchResults(null)} className="text-[var(--accent-terracotta)]">Close</button>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {searchResults.slice(0, 4).map((img: any, idx: number) => (
+                          <div
+                            key={idx}
+                            onClick={async () => {
+                              if (isReplacingImage) return;
+                              setIsReplacingImage(true);
+                              try {
+                                const res = await fetch('/api/items/search-image', {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    garmentId: editingItem.id,
+                                    imageUrl: img.url
+                                  }),
+                                });
+                                const data = await res.json();
+                                if (res.ok) {
+                                  setEditingItem({
+                                    ...editingItem,
+                                    images: data.images
+                                  });
+                                  await fetchItems();
+                                  setSearchResults(null);
+                                } else {
+                                  alert(`Failed to add photo: ${data.error || 'Unknown error'}`);
+                                }
+                              } catch (err: any) {
+                                alert(`Error replacing photo: ${err.message}`);
+                              } finally {
+                                setIsReplacingImage(false);
+                              }
+                            }}
+                            className="relative aspect-square border border-[#EAE5D9] rounded-xl overflow-hidden bg-white cursor-pointer hover:border-[var(--accent-terracotta)] transition group"
+                          >
+                            <img src={img.url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
+                            <div className="absolute inset-x-0 bottom-0 bg-white/80 text-[7px] text-[var(--text-secondary)] px-1 py-0.5 truncate text-center group-hover:text-[var(--accent-terracotta)] font-bold">
+                              {img.source}
+                            </div>
+                            {isReplacingImage && (
+                              <div className="absolute inset-0 bg-white/60 flex items-center justify-center text-[8px] text-[var(--accent-terracotta)] animate-pulse font-bold">
+                                Adding...
+                              </div>
+                            )}
                           </div>
                         ))}
+                      </div>
                     </div>
-                  </details>
-                )}
-              </div>
-
-              {/* STYLE PAIRINGS COORDINATION */}
-              <div className="space-y-2 border-t border-[#EAE5D9] pt-2.5">
-                <span className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">👖 Wardrobe Pairings (In Closet)</span>
-                <div className="flex gap-2 overflow-x-auto py-1 scrollbar-none">
-                  {items
-                    .filter(i => i.id !== editingItem.id && (
-                      (editingItem.category === 'Tops' && (i.category === 'Bottoms' || i.category === 'Outerwear')) ||
-                      (editingItem.category === 'Bottoms' && (i.category === 'Tops' || i.category === 'Footwear')) ||
-                      (editingItem.category === 'Outerwear' && i.category === 'Tops') ||
-                      (editingItem.category === 'Footwear' && i.category === 'Bottoms')
-                    ))
-                    .slice(0, 5)
-                    .map(pairing => (
-                      <button
-                        key={pairing.id}
-                        type="button"
-                        onClick={() => setEditingItem(pairing)}
-                        className="w-10 h-10 border border-[#EAE5D9] rounded-xl overflow-hidden bg-white shrink-0 relative hover:border-[var(--accent-terracotta)] transition"
-                        title={`Pair with ${pairing.brand || 'Unbranded'} ${pairing.sub_category}`}
-                      >
-                        <img src={pairing.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
-                      </button>
-                    ))}
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLookbookInput(`Construct a premium outfit centered around wearing my ${editingItem.brand || 'Unbranded'} ${editingItem.sub_category} (${editingItem.color_family})`);
-                    setActiveTab('stylist');
-                    setEditingItem(null);
-                  }}
-                  className="w-full py-2.5 bg-[#FAF8F5] text-[var(--accent-terracotta)] border border-[#EAE5D9] rounded-xl text-[10px] font-black uppercase tracking-wider active:scale-[0.98] transition mt-1"
-                >
-                  🤖 Style Outfit Around This
-                </button>
+
+                {/* Thumbnails list in editor */}
+                <div className="relative flex justify-center gap-1.5 overflow-x-auto py-1">
+                  {isUploadingImage && (
+                    <div className="absolute inset-0 bg-white/60 z-30 flex items-center justify-center rounded-2xl">
+                      <div className="w-4 h-4 rounded-full border border-[var(--accent-terracotta)] border-t-transparent animate-spin"></div>
+                    </div>
+                  )}
+                  {editingItem.images.map((img: any) => (
+                    <div 
+                      key={img.id} 
+                      onClick={() => setPrimaryImage(img.id)}
+                      className={`relative w-9 h-9 border rounded-xl overflow-hidden bg-white shrink-0 cursor-pointer group transition ${
+                        img.is_primary_profile ? 'border-[var(--accent-terracotta)] ring-1 ring-[var(--accent-terracotta)]' : 'border-[#EAE5D9] hover:border-[#DCD1C0]'
+                      }`}
+                    >
+                      <img src={img.storage_path} alt="" className="object-contain w-full h-full mix-blend-multiply" />
+                      {!img.is_primary_profile && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteGarmentImage(img.id);
+                          }}
+                          className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-[var(--accent-terracotta)] hover:bg-[var(--accent-terracotta)]/85 rounded-full flex items-center justify-center text-[7px] text-white font-extrabold opacity-0 group-hover:opacity-100 transition"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex justify-between pt-3 border-t border-[#EAE5D9] mt-2">
+              {/* Right Column: Metadata Fields Form */}
+              <div className="space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Category</label>
+                      <select
+                        value={editingItem.category}
+                        onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      >
+                        <option value="Tops">Tops</option>
+                        <option value="Bottoms">Bottoms</option>
+                        <option value="Outerwear">Outerwear</option>
+                        <option value="Footwear">Footwear</option>
+                        <option value="Tailoring">Tailoring</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Status</label>
+                      <select
+                        value={editingItem.status}
+                        onChange={(e) => setEditingItem({ ...editingItem, status: e.target.value as any })}
+                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      >
+                        <option value="Active">Active Closet</option>
+                        <option value="Archive">Archive (Doesn't Fit)</option>
+                        <option value="Donate">Pending Donate</option>
+                        <option value="Discard">Discard / Sell</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Sub-Category</label>
+                      <input
+                        type="text"
+                        value={editingItem.sub_category}
+                        onChange={(e) => setEditingItem({ ...editingItem, sub_category: e.target.value })}
+                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Brand</label>
+                      <input
+                        type="text"
+                        value={editingItem.brand || ''}
+                        onChange={(e) => setEditingItem({ ...editingItem, brand: e.target.value || null })}
+                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Purchase Price ($)</label>
+                      <input
+                        type="number"
+                        value={editingItem.price || 0}
+                        onChange={(e) => setEditingItem({ ...editingItem, price: Number(e.target.value) })}
+                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Purchase Year</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 2026"
+                        value={editingItem.purchase_year || ''}
+                        onChange={(e) => setEditingItem({ ...editingItem, purchase_year: e.target.value ? Number(e.target.value) : null })}
+                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Fabric</label>
+                      <input
+                        type="text"
+                        value={editingItem.fabric_type || ''}
+                        onChange={(e) => setEditingItem({ ...editingItem, fabric_type: e.target.value || null })}
+                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Fit Block</label>
+                      <input
+                        type="text"
+                        value={editingItem.fit_block || ''}
+                        onChange={(e) => setEditingItem({ ...editingItem, fit_block: e.target.value || null })}
+                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Color Family</label>
+                      <input
+                        type="text"
+                        value={editingItem.color_family}
+                        onChange={(e) => setEditingItem({ ...editingItem, color_family: e.target.value })}
+                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Sleeve / Detail</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Long Sleeve, Short Sleeve"
+                        value={editingItem.style_detail || ''}
+                        onChange={(e) => setEditingItem({ ...editingItem, style_detail: e.target.value || null })}
+                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Notes Field */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">📝 Notes</label>
+                    <textarea
+                      value={editingItem.notes || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, notes: e.target.value || null })}
+                      placeholder="Add personal notes, care instructions, styling ideas..."
+                      rows={3}
+                      className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2.5 text-xs text-[var(--text-primary)] resize-none focus:outline-none focus:border-[var(--accent-terracotta)]/40"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Curation Actions + Wear History */}
+                  <div className="space-y-2 border-t border-[#EAE5D9] pt-2.5">
+                    <div className="flex gap-2 items-center justify-between text-xs text-[var(--text-secondary)]">
+                      <span className="text-[10px] uppercase font-bold">Wear History</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[var(--text-primary)] font-extrabold">{getItemWornCount(editingItem.id)}x total</span>
+                        <button
+                          type="button"
+                          onClick={() => logGarmentWorn(editingItem.id)}
+                          className="px-3 py-1 rounded-lg bg-[var(--accent-terracotta)] text-white font-extrabold text-xs"
+                        >
+                          + Log Wear
+                        </button>
+                      </div>
+                    </div>
+                    {/* Collapsible scrollable history */}
+                    {wearLogs.filter(l => l.garment_id === editingItem.id).length > 0 && (
+                      <details className="group">
+                        <summary className="text-[10px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)] transition select-none list-none flex items-center gap-1 font-bold">
+                          <span className="group-open:hidden">▶</span>
+                          <span className="hidden group-open:inline">▼</span>
+                          {wearLogs.filter(l => l.garment_id === editingItem.id).length} wear entries
+                        </summary>
+                        <div className="mt-1.5 max-h-32 overflow-y-auto space-y-0.5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2.5">
+                          {wearLogs
+                            .filter(l => l.garment_id === editingItem.id)
+                            .sort((a, b) => new Date(b.worn_at).getTime() - new Date(a.worn_at).getTime())
+                            .map((log, idx) => (
+                              <div key={log.id} className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] py-0.5 border-b border-[#FAF8F5] last:border-0 font-semibold">
+                                <span>#{wearLogs.filter(l => l.garment_id === editingItem.id).length - idx}</span>
+                                <span>{new Date(log.worn_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                              </div>
+                            ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-span-1 md:col-span-2 flex justify-between pt-3 border-t border-[#EAE5D9] mt-2">
                 <button
                   type="button"
                   onClick={async () => {

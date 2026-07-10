@@ -15,9 +15,9 @@ export async function POST(request: Request) {
 
     console.log(`Starting AI outfit generation with prompt: "${prompt}"`);
 
-    // Call Hugging Face Serverless Text-to-Image API (StabilityAI SDXL)
+    // Call Hugging Face Serverless Text-to-Image API (FLUX.1-schnell)
     const hfResponse = await fetch(
-      'https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0',
+      'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell',
       {
         method: 'POST',
         headers: {
@@ -26,10 +26,6 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           inputs: prompt,
-          parameters: {
-            guidance_scale: 7.5,
-            num_inference_steps: 30,
-          }
         }),
       }
     );

@@ -8,7 +8,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing personImage or garmentImage.' }, { status: 400 });
     }
 
-    const replicateToken = process.env.REPLICATE_API_TOKEN || '';
+    const replicateToken = process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_KEY || '';
     if (!replicateToken) {
       // Mock Try-On output for local sandbox testing
       console.warn('REPLICATE_API_TOKEN is not set. Returning demo VTON output.');
