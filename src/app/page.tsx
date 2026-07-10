@@ -2701,12 +2701,21 @@ export default function Home() {
 
                               <div className="grid grid-cols-3 gap-2 mb-3">
                                 {outfitItems.map(oi => (
-                                  <div key={oi.id} className="border border-[#EAE5D9] bg-[#FBFBFA] rounded-2xl overflow-hidden flex flex-col">
+                                  <div key={oi.id} className="border border-[#EAE5D9] bg-[#FBFBFA] rounded-2xl overflow-hidden flex flex-col relative group">
+                                    {/* Color Indicator Swatch Badge */}
+                                    <div className="absolute top-1 right-1 z-10 flex items-center justify-center">
+                                      <span 
+                                        className="w-3.5 h-3.5 rounded-full border border-white shadow-sm block" 
+                                        style={{ backgroundColor: oi.hex_code || '#ddd' }} 
+                                        title={`${oi.color_family || 'Custom Color'} swatch`}
+                                      />
+                                    </div>
                                     <div className="relative aspect-square w-full">
                                       <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
                                     </div>
                                     <div className="p-1 text-center bg-[#F5F2EB] border-t border-[#EAE5D9]">
-                                      <p className="text-[8px] font-black text-[var(--text-secondary)] truncate">{oi.sub_category}</p>
+                                      <p className="text-[8.5px] font-black text-[var(--text-primary)] truncate">{oi.brand ? `${oi.brand} ` : ''}{oi.sub_category}</p>
+                                      <p className="text-[7.5px] font-bold text-[var(--text-secondary)] truncate lowercase">{oi.fabric_type || ''} • {oi.color_family}</p>
                                     </div>
                                   </div>
                                 ))}
@@ -3559,8 +3568,22 @@ export default function Home() {
 
                               <div className="grid grid-cols-3 gap-2 mb-3">
                                 {outfitItems.map(oi => (
-                                  <div key={oi.id} className="border border-[#EAE5D9] bg-[#FBFBFA] rounded-2xl overflow-hidden aspect-square flex items-center justify-center p-1.5 shadow-sm">
-                                    <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
+                                  <div key={oi.id} className="border border-[#EAE5D9] bg-[#FBFBFA] rounded-2xl overflow-hidden flex flex-col relative shadow-sm">
+                                    {/* Color Indicator Badge */}
+                                    <div className="absolute top-1 right-1 z-10 flex items-center justify-center">
+                                      <span 
+                                        className="w-3.5 h-3.5 rounded-full border border-white shadow-sm block" 
+                                        style={{ backgroundColor: oi.hex_code || '#ddd' }} 
+                                        title={`${oi.color_family || 'Custom Color'} swatch`}
+                                      />
+                                    </div>
+                                    <div className="relative aspect-square w-full flex items-center justify-center p-1.5">
+                                      <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
+                                    </div>
+                                    <div className="p-1 bg-[#F5F2EB] border-t border-[#EAE5D9] text-center">
+                                      <p className="text-[8.5px] font-black text-[var(--text-primary)] truncate">{oi.brand ? `${oi.brand} ` : ''}{oi.sub_category}</p>
+                                      <p className="text-[7.5px] font-bold text-[var(--text-secondary)] truncate lowercase">{oi.fabric_type || ''} • {oi.color_family}</p>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -3679,11 +3702,21 @@ export default function Home() {
                               {/* Constituents grid (Large polaroid thumbs) */}
                               <div className="grid grid-cols-3 gap-2">
                                 {outfitItems.map(oi => (
-                                  <div key={oi.id} className="border border-[#EAE5D9] bg-[#FBFBFA] rounded-2xl overflow-hidden aspect-square flex items-center justify-center p-1.5 shadow-sm relative">
-                                    <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
-                                    <span className="absolute bottom-1 inset-x-1 bg-white/95 border border-[#EAE5D9] text-[7px] font-black text-center text-[var(--text-secondary)] py-0.5 rounded-lg truncate">
-                                      {oi.sub_category}
-                                    </span>
+                                  <div key={oi.id} className="border border-[#EAE5D9] bg-[#FBFBFA] rounded-2xl overflow-hidden flex flex-col relative shadow-sm">
+                                    {/* Color Indicator Badge */}
+                                    <div className="absolute top-1 right-1 z-10 flex items-center justify-center">
+                                      <span 
+                                        className="w-3 h-3 rounded-full border border-white shadow-sm block" 
+                                        style={{ backgroundColor: oi.hex_code || '#ddd' }} 
+                                        title={`${oi.color_family || 'Custom Color'} swatch`}
+                                      />
+                                    </div>
+                                    <div className="relative aspect-square w-full flex items-center justify-center p-1.5">
+                                      <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
+                                    </div>
+                                    <div className="p-1 bg-[#F5F2EB] border-t border-[#EAE5D9] text-center">
+                                      <p className="text-[8px] font-black text-[var(--text-primary)] truncate">{oi.brand ? `${oi.brand} ` : ''}{oi.sub_category}</p>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
