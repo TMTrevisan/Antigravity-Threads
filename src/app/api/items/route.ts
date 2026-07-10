@@ -85,6 +85,11 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Item ID is required.' }, { status: 400 });
     }
 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json({ error: 'Invalid UUID format provided for deletion. Please verify the ID parameter.' }, { status: 400 });
+    }
+
     const client = getSupabaseClient(request);
     // 1. Fetch all associated garment images
     const { data: images, error: fetchError } = await client

@@ -383,9 +383,21 @@ export async function POST(request: Request) {
       } catch (err: any) {
         console.error(`Error processing batch item ${id}:`, err);
 
+        // Fetch current notes to avoid overwriting them
+        const { data: currentGarment } = await supabase
+          .from('garments')
+          .select('notes')
+          .eq('id', id)
+          .single();
+
+        const errorMsg = err.message || 'Processing failed.';
+        const combinedNotes = currentGarment?.notes 
+          ? `${currentGarment.notes}\n\n[Ingestion Error: ${errorMsg}]`
+          : `[Ingestion Error: ${errorMsg}]`;
+
         await supabase
           .from('garments')
-          .update({ status: 'Processing_Failed', notes: err.message || 'Processing failed.' })
+          .update({ status: 'Processing_Failed', notes: combinedNotes })
           .eq('id', id);
 
         return { id, success: false, error: err.message };
