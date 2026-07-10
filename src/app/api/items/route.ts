@@ -113,7 +113,29 @@ export async function DELETE(request: Request) {
       }
     }
 
-    // 3. Delete row from database (Cascades deletion to garment_images due to foreign key constraint)
+    // 3. Clean up referencing saved outfits to prevent foreign key mismatch or layout crashes
+    try {
+      const { data: outfits } = await supabase.from('saved_outfits').select('id, item_ids');
+      if (outfits && outfits.length > 0) {
+        for (const outfit of outfits) {
+          if (Array.isArray(outfit.item_ids) && outfit.item_ids.includes(id)) {
+            const updatedIds = outfit.item_ids.filter((itemId: string) => itemId !== id);
+            if (updatedIds.length === 0) {
+              await supabase.from('saved_outfits').delete().eq('id', outfit.id);
+            } else {
+              await supabase
+                .from('saved_outfits')
+                .update({ item_ids: updatedIds })
+                .eq('id', outfit.id);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Orphaned outfit cleanup failed:', err);
+    }
+
+    // 4. Delete row from database (Cascades deletion to garment_images due to foreign key constraint)
     const { error: deleteError } = await supabase
       .from('garments')
       .delete()

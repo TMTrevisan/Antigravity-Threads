@@ -791,12 +791,22 @@ export default function Home() {
 
   // Trigger batch upload and process loop
   const triggerBatchUpload = async () => {
-    if (ingestGroups.length === 0) return;
+    const pendingGroups = ingestGroups.filter(g => g.status === 'pending');
+    if (pendingGroups.length === 0) return;
+
+    // Enforce 20 item limit per trigger to avoid API limits and browser crashes
+    if (pendingGroups.length > 20) {
+      alert("Atelier Safety Cap: You can upload a maximum of 20 garments at once. Please remove some items or process in smaller batches.");
+      return;
+    }
+
     setIsProcessingBatch(true);
     const successfullyUploadedIds: string[] = [];
 
-    const uploadPromises = ingestGroups.map(async (group, index) => {
-      if (group.status !== 'pending') return;
+    // Process sequentially to protect memory, avoid server timeout, and ensure progress recovery
+    for (let index = 0; index < ingestGroups.length; index++) {
+      const group = ingestGroups[index];
+      if (group.status !== 'pending') continue;
 
       setIngestGroups(prev => prev.map((g, idx) => idx === index ? { ...g, status: 'uploading' } : g));
 
@@ -831,9 +841,7 @@ export default function Home() {
         console.error(err);
         setIngestGroups(prev => prev.map((g, idx) => idx === index ? { ...g, status: 'failed', error: err.message } : g));
       }
-    });
-
-    await Promise.all(uploadPromises);
+    }
 
     if (successfullyUploadedIds.length > 0) {
       try {
