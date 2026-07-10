@@ -134,6 +134,7 @@ export default function Home() {
   const [searchQueryText, setSearchQueryText] = useState('');
   const [isMergingGarments, setIsMergingGarments] = useState(false);
   const [mergeTargetGarmentId, setMergeTargetGarmentId] = useState('');
+  const [gridColumns, setGridColumns] = useState<1 | 2 | 3>(3);
 
   useEffect(() => {
     if (editingItem) {
@@ -2539,6 +2540,21 @@ export default function Home() {
                           Matrix
                         </button>
                       </div>
+
+                      {viewMode === 'grid' && (
+                        <div className="flex rounded-xl bg-[#F5F2EB] p-1 border border-[#EAE5D9]">
+                          {[1, 2, 3].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setGridColumns(num as 1 | 2 | 3)}
+                              className={`p-1.5 px-2.5 rounded-lg text-[10px] uppercase font-black transition ${gridColumns === num ? 'bg-[var(--accent-sage)] text-white' : 'text-[var(--text-secondary)]'}`}
+                            >
+                              {num} Col
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2550,7 +2566,13 @@ export default function Home() {
                       <p className="text-[var(--text-secondary)] text-xs">No matching garments found in your closet.</p>
                     </div>
                   ) : viewMode === 'grid' ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div className={`grid gap-5 ${
+                      gridColumns === 1 
+                        ? 'grid-cols-1' 
+                        : gridColumns === 2 
+                        ? 'grid-cols-1 sm:grid-cols-2' 
+                        : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                    }`}>
                       {filteredItems.map((item) => (
                         <div 
                           key={item.id}
