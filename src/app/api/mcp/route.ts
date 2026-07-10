@@ -41,6 +41,27 @@ const TOOLS = [
       required: ['description'],
     },
   },
+  {
+    name: 'list_garments',
+    description: 'Query all garments optionally filtered by category.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', description: 'Optional. Valid options: Tops, Bottoms, Outerwear, Footwear, Tailoring' }
+      }
+    }
+  },
+  {
+    name: 'delete_garment',
+    description: 'Permanently remove a garment from inventory using its UUID.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The unique UUID of the garment to delete' }
+      },
+      required: ['id']
+    }
+  }
 ];
 
 export async function POST(request: Request) {
@@ -194,6 +215,110 @@ export async function POST(request: Request) {
               ],
             },
             id,
+          });
+        }
+
+        case 'list_garments': {
+          const { category } = args || {};
+          
+          if (category) {
+            const validCategories = ['Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Tailoring'];
+            if (!validCategories.includes(category)) {
+              return NextResponse.json({
+                jsonrpc: '2.0',
+                error: { 
+                  code: -32602, 
+                  message: `Invalid Category filter. Must be one of: ${validCategories.join(', ')}` 
+                },
+                id
+              });
+            }
+          }
+
+          let query = supabase.from('garments').select('*').eq('status', 'Active');
+          if (category) {
+            query = query.eq('category', category);
+          }
+
+          const { data: garments, error } = await query;
+          if (error) {
+            return NextResponse.json({
+              jsonrpc: '2.0',
+              error: { code: -32004, message: error.message },
+              id
+            });
+          }
+
+          const serialized = (garments || [])
+            .map((item: any) => `${item.id}|${item.category}|${item.sub_category}|${item.color_family}|${item.fabric_type}|${item.brand || 'Generic'}`)
+            .join('\n');
+
+          return NextResponse.json({
+            jsonrpc: '2.0',
+            result: {
+              content: [{
+                type: 'text',
+                text: serialized || 'No items found matching the filters.'
+              }]
+            },
+            id
+          });
+        }
+
+        case 'delete_garment': {
+          const { id: itemId } = args || {};
+
+          // UUID validation regex check
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          if (!itemId || !uuidRegex.test(itemId)) {
+            return NextResponse.json({
+              jsonrpc: '2.0',
+              error: { 
+                code: -32602, 
+                message: 'Invalid UUID format provided for deletion. Please check the garment ID and try again.' 
+              },
+              id
+            });
+          }
+
+          // Fetch to check existence
+          const { data: garmentCheck } = await supabase.from('garments').select('id').eq('id', itemId).single();
+          if (!garmentCheck) {
+            return NextResponse.json({
+              jsonrpc: '2.0',
+              error: { 
+                code: -32005, 
+                message: 'Garment not found in closet.' 
+              },
+              id
+            });
+          }
+
+          // Delete image relationships
+          await supabase.from('garment_images').delete().eq('garment_id', itemId);
+
+          const { error: deleteError } = await supabase
+            .from('garments')
+            .delete()
+            .eq('id', itemId);
+
+          if (deleteError) {
+            return NextResponse.json({
+              jsonrpc: '2.0',
+              error: { code: -32006, message: deleteError.message },
+              id
+            });
+          }
+
+          return NextResponse.json({
+            jsonrpc: '2.0',
+            result: {
+              content: [{
+                type: 'text',
+                text: `Success! Garment ID ${itemId} has been permanently deleted from your inventory.`
+              }]
+            },
+            id
           });
         }
 

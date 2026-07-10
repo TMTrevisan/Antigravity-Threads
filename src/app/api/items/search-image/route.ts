@@ -158,7 +158,7 @@ export async function POST(request: Request) {
     const queryText = `Find 6 direct, high-quality product image URLs (ending in .jpg, .jpeg, .png, or .webp) for the exact garment: "${cleanSearchQuery}". Search only official brand sites, Nordstrom, SSENSE, Farfetch, Mr Porter, or similar premium fashion retailers. Return ONLY direct image file URLs — no redirect links, no HTML page links.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-flash-lite-latest',
       contents: [{ text: queryText }],
       config: {
         tools: [{ googleSearch: {} }],
