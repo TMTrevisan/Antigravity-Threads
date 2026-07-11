@@ -699,8 +699,8 @@ export default function Home() {
   const [touchCurrentStylist, setTouchCurrentStylist] = useState<number | null>(null);
   const [isSwipingStylist, setIsSwipingStylist] = useState(false);
 
-  const handleGenerateStylist = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerateStylist = async (e?: React.FormEvent | null) => {
+    e?.preventDefault?.();
     setIsGenerating(true);
     setStylingError('');
     setStylistResult(null);
@@ -2715,8 +2715,12 @@ export default function Home() {
                               body: JSON.stringify({ prompt }),
                             });
                             const data = await res.json();
+                            const payload = data.data ?? data;
                             if (res.ok) {
-                              setVisualModal({ ...visualModal, genUrl: (data.data ?? data).url, loading: false });
+                              setVisualModal({ ...visualModal, genUrl: payload.url, loading: false });
+                              if (payload.isMock && payload.message) {
+                                notify.info(payload.message);
+                              }
                             } else {
                               notify.error(`Generation failed: ${data.error || 'Check server logs.'}`);
                               setVisualModal({ ...visualModal, loading: false });
@@ -3209,11 +3213,17 @@ export default function Home() {
                     <div className="flex gap-2 items-center justify-between text-xs text-[var(--text-secondary)]">
                       <button
                         type="button"
-                        onClick={() => {
-                          // Prefill stylist input with garment details and switch tab
-                          setLookbookInput(`Built around: ${editingItem.brand || ''} ${editingItem.color_family} ${editingItem.sub_category}`.trim());
-                          setActiveTab('stylist');
+                        onClick={async () => {
+                          // Prefill stylist input with garment details, switch tab,
+                          // and immediately run the generation so the user gets
+                          // 4–6 outfit options without a second click.
+                          const prompt = `Built around: ${editingItem.brand || ''} ${editingItem.color_family} ${editingItem.sub_category}`.trim();
+                          setLookbookInput(prompt);
+                          setEventInput(prompt);
                           setEditingItem(null);
+                          setActiveTab('stylist');
+                          // Wait a tick so the stylist tab mounts before we fire.
+                          setTimeout(() => handleGenerateStylist(null), 50);
                         }}
                         className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/20 hover:bg-[var(--accent-terracotta)]/20 font-black text-[10px] uppercase tracking-wider transition active:scale-95"
                       >
