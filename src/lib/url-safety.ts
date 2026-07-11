@@ -37,7 +37,12 @@ function isPrivateIPv4(host: string): boolean {
 }
 
 function isPrivateIPv6(host: string): boolean {
-  const normalized = host.toLowerCase().split('%')[0];
+  // `new URL('https://[::1]/').hostname` returns `[::1]` with brackets.
+  // Strip them, plus any IPv6 zone-id suffix (e.g. `fe80::1%eth0`).
+  const normalized = host
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+    .split('%')[0];
   return PRIVATE_IPV6_PREFIXES.some((p) => normalized.startsWith(p));
 }
 

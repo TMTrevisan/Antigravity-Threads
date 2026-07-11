@@ -26,6 +26,9 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit
 
+      - name: Tests
+        run: npm test
+
       - name: Lint
         run: npm run lint -- --max-warnings=0 || echo "lint warnings present (non-blocking)"
 

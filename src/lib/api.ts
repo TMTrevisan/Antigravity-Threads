@@ -28,13 +28,10 @@ export function withUser<T = unknown>(
       return await handler({ user, request });
     } catch (err: any) {
       if (err instanceof UnauthorizedError) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        return fail(401, 'Unauthorized');
       }
       console.error(`API error in ${handler.name || 'handler'}:`, err);
-      return NextResponse.json(
-        { error: err?.message || 'Internal server error' },
-        { status: 500 }
-      );
+      return fail(500, err?.message || 'Internal server error');
     }
   };
 }
