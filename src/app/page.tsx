@@ -3,77 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AuthGate from '@/components/AuthGate';
 import { useToasts, useConfirmAction } from '@/components/Toaster';
-
-interface GarmentImage {
-  id: string;
-  storage_path: string;
-  is_primary_profile: boolean;
-  asset_type: 'profile' | 'detail';
-}
-
-interface Garment {
-  id: string;
-  category: string;
-  sub_category: string;
-  brand: string | null;
-  color_family: string;
-  hex_code: string | null;
-  tonal_value: string | null;
-  fabric_type: string | null;
-  fit_block: string | null;
-  style_detail: string | null;
-  status: 'Active' | 'Archive' | 'Donate' | 'Discard' | 'Processing' | 'Processing_Failed';
-  images: GarmentImage[];
-  primary_image_url: string | null;
-  notes: string | null;
-  price: number;
-  purchase_year: number | null;
-  created_at: string;
-}
-
-interface WearLog {
-  id: string;
-  garment_id: string;
-  worn_at: string;
-}
-
-interface SavedOutfit {
-  id: string;
-  name: string;
-  item_ids: string[];
-  styling_reasoning: string | null;
-  created_at: string;
-}
-
-interface StylistOutput {
-  outfits: Array<{
-    name: string;
-    item_ids: string[];
-    styling_reasoning: string;
-  }>;
-  gap_analysis: string;
-  general_tips: string[];
-}
-
-interface TelemetryStats {
-  totalTokensIn: number;
-  totalTokensOut: number;
-  totalCost: number;
-  services: Array<{
-    service: string;
-    count: number;
-    avgLatencyMs: number;
-    totalCost: number;
-  }>;
-}
-
-interface IngestGroup {
-  id: string;
-  files: File[];
-  notes: string;
-  status: 'pending' | 'uploading' | 'processing' | 'done' | 'failed';
-  error?: string;
-}
+import ChatPanel from '@/components/ChatPanel';
+import type { Garment, WearLog, SavedOutfit, StylistOutput, TelemetryStats, IngestGroup } from '@/types/db';
+import { INGEST_LIMITS } from '@/lib/constants';
+import { getItemWornCount, getItemCostPerWear, filterGarments } from '@/lib/garment-utils';
+import { compressImage, drawOutfitCollage } from '@/lib/image';
+import { garmentsToCsv, downloadCsv } from '@/lib/csv';
 
 export default function Home() {
   const notify = useToasts();
@@ -150,62 +85,6 @@ export default function Home() {
   }, [editingItem, validationTarget]);
 
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatProvider, setChatProvider] = useState<'gemini' | 'openai' | 'anthropic' | 'deepseek' | 'minimax'>('gemini');
-  const [chatApiKey, setChatApiKey] = useState('');
-  const [showChatSettings, setShowChatSettings] = useState(false);
-  const [isChatTyping, setIsChatTyping] = useState(false);
-
-  useEffect(() => {
-    const savedProvider = localStorage.getItem('threads_chat_provider') as any;
-    const savedKey = localStorage.getItem('threads_chat_key') || '';
-    if (savedProvider) setChatProvider(savedProvider);
-    if (savedKey) setChatApiKey(savedKey);
-  }, []);
-
-  const sendChatMessage = async (customText?: string) => {
-    const textToSend = customText || chatInput;
-    if (!textToSend.trim()) return;
-
-    const newMessages = [...chatMessages, { role: 'user' as const, content: textToSend }];
-    setChatMessages(newMessages);
-    setChatInput('');
-    setIsChatTyping(true);
-
-    try {
-      const wardrobeContext = items
-        .map(
-          (i) =>
-            `${i.id} | ${i.category} | ${i.sub_category} | ${i.color_family} | ${i.fabric_type} | ${i.fit_block} | Wears: ${
-              wearLogs.filter((log) => log.garment_id === i.id).length
-            }`
-        )
-        .join('\n');
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: newMessages,
-          provider: chatProvider,
-          apiKey: chatApiKey,
-          wardrobe: wardrobeContext
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
-      } else {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ Error: ${data.error || 'Failed to generate response.'}` }]);
-      }
-    } catch (err: any) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ Error: ${err.message}` }]);
-    } finally {
-      setIsChatTyping(false);
-    }
-  };
 
   const uploadImageToGarment = async (file: File) => {
     if (!editingItem) return;
@@ -227,10 +106,10 @@ export default function Home() {
         });
         await fetchItems();
       } else {
-        alert(`Upload failed: ${data.error || 'Unknown error'}`);
+        notify.error(`Upload failed: ${data.error || 'Unknown error'}`);
       }
     } catch (err: any) {
-      alert(`Error uploading image: ${err.message}`);
+      notify.error(`Error uploading image: ${err.message}`);
     } finally {
       setIsUploadingImage(false);
     }
@@ -303,10 +182,10 @@ export default function Home() {
         });
         await fetchItems();
       } else {
-        alert(`Failed to set primary: ${data.error || 'Unknown error'}`);
+        notify.error(`Failed to set primary: ${data.error || 'Unknown error'}`);
       }
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      notify.error(`Error: ${err.message}`);
     } finally {
       setIsUploadingImage(false);
     }
@@ -332,10 +211,10 @@ export default function Home() {
         });
         await fetchItems();
       } else {
-        alert(`Delete failed: ${data.error || 'Unknown error'}`);
+        notify.error(`Delete failed: ${data.error || 'Unknown error'}`);
       }
     } catch (err: any) {
-      alert(`Error deleting: ${err.message}`);
+      notify.error(`Error deleting: ${err.message}`);
     } finally {
       setIsUploadingImage(false);
     }
@@ -351,74 +230,8 @@ export default function Home() {
     personImage?: string | null;
   } | null>(null);
 
-  const drawOutfitCollage = (canvas: HTMLCanvasElement, outfitItems: Garment[]) => {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    ctx.fillStyle = '#0b0c10';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.strokeStyle = 'rgba(102, 252, 241, 0.04)';
-    ctx.lineWidth = 1.5;
-    for (let x = 0; x < canvas.width; x += 40) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < canvas.height; y += 40) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-
-    let loadedCount = 0;
-    const itemsToDraw = outfitItems.filter(item => item.primary_image_url);
-    
-    if (itemsToDraw.length === 0) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '14px monospace';
-      ctx.fillText('No images available for collage.', 50, canvas.height / 2);
-      return;
-    }
-
-    itemsToDraw.forEach(item => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = item.primary_image_url!;
-      img.onload = () => {
-        let x = 0, y = 0, w = 240, h = 240;
-        const cat = item.category.toLowerCase();
-        
-        if (cat.includes('top') || cat.includes('outerwear') || cat.includes('tailoring')) {
-          x = (canvas.width - w) / 2;
-          y = 50;
-        } else if (cat.includes('bottom')) {
-          x = (canvas.width - w) / 2;
-          y = 250;
-        } else if (cat.includes('footwear')) {
-          x = (canvas.width - w) / 2;
-          y = 470;
-        } else {
-          x = 100;
-          y = 100 + loadedCount * 150;
-        }
-
-        ctx.drawImage(img, x, y, w, h);
-        
-        loadedCount++;
-        if (loadedCount === itemsToDraw.length) {
-          ctx.fillStyle = 'rgba(102, 252, 241, 0.6)';
-          ctx.font = 'bold 10px monospace';
-          ctx.fillText('ANTIGRAVITY THREADS • OUTFIT COLLAGE', 20, canvas.height - 20);
-        }
-      };
-      img.onerror = () => {
-        loadedCount++;
-      };
-    });
-  };
+  const drawOutfitCollageRef = (canvas: HTMLCanvasElement, outfitItems: Garment[]) =>
+    drawOutfitCollage(canvas, outfitItems);
 
   const runClientSideCutout = async (garmentId: string, storagePath: string) => {
     setCutoutProgress('Initializing AI engine...');
@@ -483,7 +296,7 @@ export default function Home() {
       // Background removed success confirmation (no alert popup)
     } catch (err: any) {
       console.error('AI cutout failed:', err);
-      alert(`AI Cutout Failed: ${err.message || err}`);
+      notify.error(`AI Cutout Failed: ${err.message || err}`);
     } finally {
       setCutoutProgress(null);
     }
@@ -562,10 +375,10 @@ export default function Home() {
             });
             await fetchItems();
           } else {
-            alert(`URL paste failed: ${data.error || 'Unknown error'}`);
+            notify.error(`URL paste failed: ${data.error || 'Unknown error'}`);
           }
         } catch (err: any) {
-          alert(`URL paste error: ${err.message}`);
+          notify.error(`URL paste error: ${err.message}`);
         } finally {
           setIsUploadingImage(false);
         }
@@ -618,10 +431,10 @@ export default function Home() {
         });
         await fetchItems();
       } else {
-        alert('Failed to save changes.');
+        notify.error('Failed to save changes.');
       }
     } catch (err: any) {
-      alert(`Save error: ${err.message}`);
+      notify.error(`Save error: ${err.message}`);
     }
   };
 
@@ -650,32 +463,8 @@ export default function Home() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['ID', 'Brand', 'Category', 'Sub-Category', 'Color Family', 'Hex Code', 'Tonal Value', 'Fabric Blend', 'Fit Block', 'Sleeve / Detail', 'Purchase Price', 'Purchase Year', 'Wears Count', 'Notes'];
-    const rows = items.map(i => [
-      i.id,
-      i.brand || '',
-      i.category,
-      i.sub_category,
-      i.color_family,
-      i.hex_code || '',
-      i.tonal_value || '',
-      i.fabric_type || '',
-      i.fit_block || '',
-      i.style_detail || '',
-      i.price || 0,
-      i.purchase_year || '',
-      getItemWornCount(i.id),
-      i.notes || ''
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "threads_wardrobe_export.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csv = garmentsToCsv(items, (id) => getItemWornCount(id, wearLogs));
+    downloadCsv(csv, 'threads_wardrobe_export.csv');
   };
 
   const fetchWearLogs = async () => {
@@ -717,58 +506,7 @@ export default function Home() {
     }
   };
 
-  // Image Compressor
-  const compressImage = (file: File): Promise<File> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new window.Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1000;
-          const MAX_HEIGHT = 1000;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
-                  type: 'image/jpeg',
-                  lastModified: Date.now(),
-                });
-                resolve(compressedFile);
-              } else {
-                reject(new Error('Failed to create canvas blob'));
-              }
-            },
-            'image/jpeg',
-            0.85
-          );
-        };
-      };
-      reader.onerror = (err) => reject(err);
-    });
-  };
+  // Image Compressor — now imported from @/lib/image.
 
   // Drag and select profile image (creates new group)
   const handleFilesSelected = (files: FileList | null, isCameraInput: boolean = false) => {
@@ -861,7 +599,7 @@ export default function Home() {
 
     // Enforce 20 item limit per trigger to avoid API limits and browser crashes
     if (pendingGroups.length > 20) {
-      alert("Atelier Safety Cap: You can upload a maximum of 20 garments at once. Please remove some items or process in smaller batches.");
+      notify.error("Atelier Safety Cap: You can upload a maximum of 20 garments at once. Please remove some items or process in smaller batches.");
       return;
     }
 
@@ -1017,7 +755,7 @@ export default function Home() {
         setValidationTarget(nextTarget || null);
       } else {
         const data = await res.json();
-        alert(`Failed to validate item: ${data.error}`);
+        notify.error(`Failed to validate item: ${data.error}`);
       }
     } catch (err) {
       console.error(err);
@@ -1042,7 +780,7 @@ export default function Home() {
           setValidationTarget(nextTarget || null);
         } else {
           const data = await res.json();
-          alert(`Failed to discard item: ${data.error}`);
+          notify.error(`Failed to discard item: ${data.error}`);
         }
       } else {
         // Save: Call PATCH
@@ -1071,7 +809,7 @@ export default function Home() {
           setValidationTarget(nextTarget || null);
         } else {
           const data = await res.json();
-          alert(`Failed to save item: ${data.error}`);
+          notify.error(`Failed to save item: ${data.error}`);
         }
       }
     } catch (err) {
@@ -1082,7 +820,7 @@ export default function Home() {
   // Weather geohash lookup
   const syncLocalWeather = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported.');
+      notify.error('Geolocation is not supported.');
       return;
     }
     setIsSyncingWeather(true);
@@ -1261,16 +999,6 @@ export default function Home() {
     } else {
       setSelectedItemIds(filteredItems.map(item => item.id));
     }
-  };
-
-  const getItemWornCount = (id: string) => {
-    return wearLogs.filter(l => l.garment_id === id).length;
-  };
-
-  const getItemCostPerWear = (item: Garment) => {
-    const wears = getItemWornCount(item.id);
-    if (wears === 0) return item.price || 0;
-    return Number(((item.price || 0) / wears).toFixed(2));
   };
 
   const handleUpdateNotes = (groupId: string, notes: string) => {
@@ -1743,10 +1471,10 @@ export default function Home() {
                                 if (res.ok) {
                                   setSearchResults(data.images || []);
                                 } else {
-                                  alert(`Search failed: ${data.error || 'Unknown error'}`);
+                                  notify.error(`Search failed: ${data.error || 'Unknown error'}`);
                                 }
                               } catch (err: any) {
-                                alert(`Search error: ${err.message}`);
+                                notify.error(`Search error: ${err.message}`);
                               } finally {
                                 setIsSearchingImage(false);
                               }
@@ -1931,11 +1659,11 @@ export default function Home() {
                                 });
                                 const processData = await processRes.json();
                                 if (!processRes.ok) throw new Error(processData.error || 'Ingestion re-processing failed');
-                                alert('Garment re-processed successfully!');
+                                notify.success('Garment re-processed successfully!');
                                 await fetchItems();
                                 setValidationTarget(null);
                               } catch (err: any) {
-                                alert(`Failed to re-process garment: ${err.message}`);
+                                notify.error(`Failed to re-process garment: ${err.message}`);
                               } finally {
                                 setIsReplacingImage(false);
                               }
@@ -1950,7 +1678,7 @@ export default function Home() {
                             onClick={async () => {
                               const primaryImg = validationTarget.images?.find((img: any) => img.is_primary_profile) || validationTarget.images?.[0] || { storage_path: validationTarget.primary_image_url };
                               if (!primaryImg || !primaryImg.storage_path) {
-                                alert('No image found for this garment.');
+                                notify.error('No image found for this garment.');
                                 return;
                               }
                               setValidationTarget(null);
@@ -2314,10 +2042,10 @@ export default function Home() {
                                            e.target.value = '';
                                            await fetchItems();
                                          } else {
-                                           alert('Failed to add image.');
+                                           notify.error('Failed to add image.');
                                          }
                                        } catch (err: any) {
-                                         alert(`Error: ${err.message}`);
+                                         notify.error(`Error: ${err.message}`);
                                        }
                                      }
                                    }}
@@ -2688,13 +2416,13 @@ export default function Home() {
                             </div>
                             <div className="flex justify-between items-center text-[8.5px] pt-1">
                               <span className="text-[var(--text-secondary)] font-extrabold">{item.brand || 'Unbranded'}</span>
-                              {getItemWornCount(item.id) > 0 && (
-                                <span className="text-[var(--accent-sage)] font-black">Worn {getItemWornCount(item.id)}x</span>
+                              {getItemWornCount(item.id, wearLogs) > 0 && (
+                                <span className="text-[var(--accent-sage)] font-black">Worn {getItemWornCount(item.id, wearLogs)}x</span>
                               )}
                             </div>
                             <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{item.brand ? `${item.brand} ` : ''}{item.color_family}</h4>
                             <div className="flex items-center justify-between text-[9px] text-[var(--text-secondary)] pt-2 border-t border-[#F5F2EA] mt-1.5">
-                              <span>CPW: <strong className="text-[var(--text-primary)] font-black">${getItemCostPerWear(item)}</strong></span>
+                              <span>CPW: <strong className="text-[var(--text-primary)] font-black">${getItemCostPerWear(item, getItemWornCount(item.id, wearLogs))}</strong></span>
                               <button
                                 onClick={(e) => logGarmentWorn(item.id, e)}
                                 className="text-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]/85 font-black uppercase text-[8px] tracking-wider"
@@ -2766,11 +2494,11 @@ export default function Home() {
                             </div>
                             <div className="text-right">
                               <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase block">Worn</span>
-                              <span className="text-xs font-bold text-[var(--accent-sage)]">{getItemWornCount(item.id)}x</span>
+                              <span className="text-xs font-bold text-[var(--accent-sage)]">{getItemWornCount(item.id, wearLogs)}x</span>
                             </div>
                             <div className="text-right">
                               <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase block">CPW</span>
-                              <span className="text-xs font-extrabold text-[var(--accent-terracotta)]">${getItemCostPerWear(item)}</span>
+                              <span className="text-xs font-extrabold text-[var(--accent-terracotta)]">${getItemCostPerWear(item, getItemWornCount(item.id, wearLogs))}</span>
                             </div>
                             <div onClick={(e) => e.stopPropagation()}>
                               <button
@@ -3498,10 +3226,10 @@ export default function Home() {
                       <div className="p-4 bg-[var(--bg-card-secondary)] border border-[#EAE5D9] rounded-2xl space-y-3">
                         <span className="text-[10px] uppercase font-black text-[var(--accent-terracotta)]">0 Wears Logged (Inactive Weight)</span>
                         <div className="space-y-2 max-h-[25vh] overflow-y-auto">
-                          {items.filter(i => getItemWornCount(i.id) === 0).length === 0 ? (
+                          {items.filter(i => getItemWornCount(i.id, wearLogs) === 0).length === 0 ? (
                             <p className="text-[11px] text-[var(--text-secondary)] font-bold">Great job! You have worn every item in your closet at least once.</p>
                           ) : (
-                            items.filter(i => getItemWornCount(i.id) === 0).map(i => (
+                            items.filter(i => getItemWornCount(i.id, wearLogs) === 0).map(i => (
                               <div key={i.id} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-[#EAE5D9] text-xs text-[var(--text-primary)] font-bold">
                                 <span className="truncate">{i.brand || 'Unbranded'} {i.sub_category}</span>
                                 <button
@@ -3710,7 +3438,7 @@ export default function Home() {
                           });
                           
                           if (tops.length === 0 || bottoms.length === 0) {
-                            alert('You need at least 1 top and 1 bottom active in your closet to generate outfits.');
+                            notify.error('You need at least 1 top and 1 bottom active in your closet to generate outfits.');
                             return;
                           }
                           
@@ -4455,11 +4183,11 @@ export default function Home() {
                             if (res.ok) {
                               setVisualModal({ ...visualModal, genUrl: data.url, loading: false });
                             } else {
-                              alert(`Generation failed: ${data.error || 'Check server logs.'}`);
+                              notify.error(`Generation failed: ${data.error || 'Check server logs.'}`);
                               setVisualModal({ ...visualModal, loading: false });
                             }
                           } catch (err: any) {
-                            alert(`Error generating image: ${err.message}`);
+                            notify.error(`Error generating image: ${err.message}`);
                             setVisualModal({ ...visualModal, loading: false });
                           }
                         }}
@@ -4580,14 +4308,14 @@ export default function Home() {
                               if (res.ok) {
                                 setVisualModal({ ...visualModal, genUrl: data.url, loading: false });
                                 if (data.isMock) {
-                                  alert(`Demo Try-On Output:\n\n${data.message}`);
+                                  notify.info(`Demo Try-On Output:\n\n${data.message}`);
                                 }
                               } else {
-                                alert(`Try-on failed: ${data.error || 'Check server logs.'}`);
+                                notify.error(`Try-on failed: ${data.error || 'Check server logs.'}`);
                                 setVisualModal({ ...visualModal, loading: false });
                               }
                             } catch (err: any) {
-                              alert(`Try-on error: ${err.message}`);
+                              notify.error(`Try-on error: ${err.message}`);
                               setVisualModal({ ...visualModal, loading: false });
                             }
                           }}
@@ -4704,10 +4432,10 @@ export default function Home() {
                             if (res.ok) {
                               setSearchResults(data.images || []);
                             } else {
-                              alert(`Search failed: ${data.error || 'Unknown error'}`);
+                              notify.error(`Search failed: ${data.error || 'Unknown error'}`);
                             }
                           } catch (err: any) {
-                            alert(`Search error: ${err.message}`);
+                            notify.error(`Search error: ${err.message}`);
                           } finally {
                             setIsSearchingImage(false);
                           }
@@ -4750,10 +4478,10 @@ export default function Home() {
                                   await fetchItems();
                                   setSearchResults(null);
                                 } else {
-                                  alert(`Failed to add photo: ${data.error || 'Unknown error'}`);
+                                  notify.error(`Failed to add photo: ${data.error || 'Unknown error'}`);
                                 }
                               } catch (err: any) {
-                                alert(`Error replacing photo: ${err.message}`);
+                                notify.error(`Error replacing photo: ${err.message}`);
                               } finally {
                                 setIsReplacingImage(false);
                               }
@@ -4955,7 +4683,7 @@ export default function Home() {
                         ⚡ Build Outfit Around Item
                       </button>
                       <div className="flex items-center gap-2">
-                        <span className="text-[var(--text-primary)] font-extrabold">{getItemWornCount(editingItem.id)}x total</span>
+                        <span className="text-[var(--text-primary)] font-extrabold">{getItemWornCount(editingItem.id, wearLogs)}x total</span>
                         <button
                           type="button"
                           onClick={() => logGarmentWorn(editingItem.id)}
@@ -5045,7 +4773,7 @@ export default function Home() {
                     onClick={async () => {
                       const primaryImg = editingItem.images?.find((img: any) => img.is_primary_profile) || editingItem.images?.[0] || { storage_path: editingItem.primary_image_url };
                       if (!primaryImg || !primaryImg.storage_path) {
-                        alert('No image found for this garment.');
+                        notify.error('No image found for this garment.');
                         return;
                       }
                       setEditingItem(null);
@@ -5140,156 +4868,12 @@ export default function Home() {
       </button>
 
       {/* CHAT DRAWER PANEL */}
-      {chatOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white border-l border-[#EAE5D9] shadow-2xl flex flex-col animate-slide-left text-[var(--text-primary)]">
-          {/* HEADER */}
-          <div className="p-4 border-b border-[#EAE5D9] flex items-center justify-between bg-[#FAF8F5]">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-terracotta)] animate-pulse"></span>
-              <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Threads AI Stylist</h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setShowChatSettings(!showChatSettings)} 
-                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-xl hover:bg-[#F5F2EB] transition text-sm"
-                title="AI Settings"
-              >
-                ⚙️
-              </button>
-              <button 
-                onClick={() => setChatOpen(false)} 
-                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-xl hover:bg-[#F5F2EB] transition text-sm"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-
-          {/* SETTINGS PANEL OVERLAY */}
-          {showChatSettings ? (
-            <div className="p-4 border-b border-[#EAE5D9] bg-[#FAF8F5] space-y-3">
-              <h4 className="text-[10px] uppercase font-black text-[var(--accent-terracotta)]">Stylist Model Configuration</h4>
-              <div className="space-y-2">
-                <div className="space-y-1">
-                  <label className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">AI Provider</label>
-                  <select 
-                    value={chatProvider}
-                    onChange={(e) => setChatProvider(e.target.value as any)}
-                    className="w-full bg-white border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  >
-                    <option value="gemini">Google Gemini (Recommended)</option>
-                    <option value="openai">OpenAI GPT-4o-Mini</option>
-                    <option value="anthropic">Anthropic Claude 3.5 Haiku</option>
-                    <option value="deepseek">DeepSeek Chat</option>
-                    <option value="minimax">MiniMax Text-01</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">Custom API Key (Optional)</label>
-                  <input
-                    type="password"
-                    placeholder="Enter key to override env default..."
-                    value={chatApiKey}
-                    onChange={(e) => {
-                      setChatApiKey(e.target.value);
-                      localStorage.setItem('threads_chat_key', e.target.value);
-                    }}
-                    className="w-full bg-white border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                  />
-                  <span className="text-[8px] text-[var(--text-secondary)] font-bold">Stored locally in your browser's secure cache.</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.setItem('threads_chat_provider', chatProvider);
-                    setShowChatSettings(false);
-                  }}
-                  className="w-full py-2 bg-[#FAF8F5] text-[var(--accent-terracotta)] border border-[#EAE5D9] hover:bg-[#F5F2EB] text-[10px] font-black rounded-xl transition"
-                >
-                  Save Config
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {/* MESSAGES */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#FAF8F5]">
-            {chatMessages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
-                <span className="text-3xl">🧥</span>
-                <div className="space-y-1">
-                  <p className="text-xs font-extrabold text-[var(--text-primary)]">How can I help style you today?</p>
-                  <p className="text-[10px] text-[var(--text-secondary)] font-bold">Ask about outfits, coordinate combinations, or identify closet clutter.</p>
-                </div>
-                <div className="w-full max-w-xs space-y-2 pt-2">
-                  <button
-                    onClick={() => sendChatMessage("Suggest a stylish outfit combination for warm weather")}
-                    className="w-full p-2.5 bg-white border border-[#EAE5D9] hover:border-[#FAF8F5] rounded-2xl text-[10px] text-left text-[var(--text-primary)] font-bold transition shadow-xs"
-                  >
-                    ☀️ Suggest a warm weather outfit...
-                  </button>
-                  <button
-                    onClick={() => sendChatMessage("Which items in my closet have the least number of wear counts?")}
-                    className="w-full p-2.5 bg-white border border-[#EAE5D9] hover:border-[#FAF8F5] rounded-2xl text-[10px] text-left text-[var(--text-primary)] font-bold transition shadow-xs"
-                  >
-                    📉 Find my least worn items...
-                  </button>
-                  <button
-                    onClick={() => sendChatMessage("Give me a styling recommendation using my green linen shirt")}
-                    className="w-full p-2.5 bg-white border border-[#EAE5D9] hover:border-[#FAF8F5] rounded-2xl text-[10px] text-left text-[var(--text-primary)] font-bold transition shadow-xs"
-                  >
-                    🟢 Style my green linen shirt...
-                  </button>
-                </div>
-              </div>
-            ) : (
-              chatMessages.map((m, idx) => (
-                <div key={idx} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed font-bold shadow-xs ${
-                    m.role === 'user' 
-                      ? 'bg-[var(--accent-terracotta)] text-white border border-[var(--accent-terracotta)]/40' 
-                      : 'bg-white border border-[#EAE5D9] text-[var(--text-primary)]'
-                  }`}>
-                    {m.content}
-                  </div>
-                </div>
-              ))
-            )}
-            {isChatTyping && (
-              <div className="flex justify-start">
-                <div className="bg-white border border-[#EAE5D9] text-[var(--text-secondary)] rounded-2xl px-3.5 py-2.5 text-xs flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-terracotta)] animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-terracotta)] animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-terracotta)] animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* INPUT FORM */}
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              sendChatMessage();
-            }} 
-            className="p-3 border-t border-[#EAE5D9] bg-[#FAF8F5] flex gap-2"
-          >
-            <input
-              type="text"
-              placeholder="Ask Stylist..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              className="flex-1 bg-white border border-[#EAE5D9] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40 font-bold"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 bg-[var(--accent-terracotta)] text-white font-extrabold text-xs rounded-xl hover:bg-[var(--accent-terracotta)]/95 shadow-md active:scale-95 transition"
-            >
-              Send
-            </button>
-          </form>
-        </div>
-      )}
+      <ChatPanel
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        items={items}
+        wearLogs={wearLogs}
+      />
       </div>
     </AuthGate>
   );
