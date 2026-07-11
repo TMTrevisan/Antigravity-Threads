@@ -6,39 +6,25 @@
 --   Before commit f47d8b8 (auth + user_id on every insert), the API routes
 --   used Supabase's admin client which bypasses RLS. Inserts fell through to
 --   the `user_id DEFAULT auth.uid()` default, but with the admin client
---   auth.uid() returns NULL. The result: every row created before that commit
---   has user_id = NULL.
+--   auth.uid() returns NULL. Every row created before that commit has
+--   user_id = NULL. After f47d8b8, RLS hides them from every user.
 --
---   After f47d8b8, all routes use the JWT-scoped client, and RLS hides rows
---   where user_id ≠ auth.uid() — which means all of those NULL rows are
---   invisible to every user.
---
--- Run this once per user that lost access. It is idempotent: re-running
--- after the rows are already owned will simply skip them (the WHERE clause
--- requires user_id IS NULL).
+-- Run this once per user that lost access. Idempotent (WHERE user_id IS NULL).
 -- ════════════════════════════════════════════════════════════════════════════
-
--- Set the target user once (change the email if you need a different user).
-WITH target AS (
-  SELECT id AS uid FROM auth.users WHERE email = 'mrtoddles11@gmail.com' LIMIT 1
-)
+-- Change the email below if you need to recover a different user.
 
 UPDATE public.garments AS g
-  SET user_id = t.uid
-  FROM target t
+  SET user_id = (SELECT id FROM auth.users WHERE email = 'mrtoddles11@gmail.com' LIMIT 1)
   WHERE g.user_id IS NULL;
 
 UPDATE public.wear_logs AS w
-  SET user_id = t.uid
-  FROM target t
+  SET user_id = (SELECT id FROM auth.users WHERE email = 'mrtoddles11@gmail.com' LIMIT 1)
   WHERE w.user_id IS NULL;
 
 UPDATE public.saved_outfits AS s
-  SET user_id = t.uid
-  FROM target t
+  SET user_id = (SELECT id FROM auth.users WHERE email = 'mrtoddles11@gmail.com' LIMIT 1)
   WHERE s.user_id IS NULL;
 
 UPDATE public.user_measurements AS m
-  SET user_id = t.uid
-  FROM target t
+  SET user_id = (SELECT id FROM auth.users WHERE email = 'mrtoddles11@gmail.com' LIMIT 1)
   WHERE m.user_id IS NULL;
