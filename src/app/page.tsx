@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import AuthGate from '@/components/AuthGate';
-import { Toaster, useToasts, useConfirmAction } from '@/components/Toaster';
+import { useToasts, useConfirmAction } from '@/components/Toaster';
 
 interface GarmentImage {
   id: string;
@@ -1339,9 +1339,8 @@ export default function Home() {
   });
 
   return (
-    <Toaster>
-      <AuthGate>
-        <div className="flex-1 flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] min-h-screen">
+    <AuthGate>
+      <div className="flex-1 flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] min-h-screen">
         
         {/* HIDDEN FILE INPUT FOR DETAIL IMAGES */}
         <input 
@@ -5292,7 +5291,6 @@ export default function Home() {
         </div>
       )}
       </div>
-      </AuthGate>
-    </Toaster>
+    </AuthGate>
   );
 }
