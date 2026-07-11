@@ -8,30 +8,35 @@ interface AuthGateProps {
 }
 
 /**
- * Installs a global `window.fetch` proxy that injects the current Supabase
- * access token as a Bearer header on every request. The original `fetch` is
- * captured once and restored on cleanup.
+ * Install a global `window.fetch` proxy that injects the latest Supabase
+ * access token as a Bearer header on every request.
  *
- * Notes / pitfalls this avoids:
- *  - Previously the proxy was re-installed on every session change AND every
- *    initial `getSession` call, which double-wrapped the proxy and never
- *    unwrapped it on sign-out (subsequent requests kept carrying a stale or
- *    undefined Bearer header).
- *  - We hold the *latest* token in a ref so the proxy always sees the
- *    current value rather than the value captured at install time.
- *  - We never throw if the token is missing; we simply skip header injection.
+ * Why we read the token from the live supabase client on each call (instead
+ * of caching it in a ref at install time): Supabase access tokens expire
+ * (~1 hour). If we cached, every fetch after expiry would 401. Reading from
+ * `supabase.auth.getSession()` returns the cached session, and Supabase's
+ * internal refresh timer keeps the token fresh as long as `autoRefreshToken`
+ * is on (the default).
+ *
+ * The original `window.fetch` is captured once and restored on cleanup.
  */
-function installAuthHeaderProxy(getToken: () => string | null): () => void {
+function installAuthHeaderProxy(): () => void {
   if (typeof window === 'undefined') return () => {};
   const original = window.fetch.bind(window);
-  window.fetch = ((resource: RequestInfo | URL, config: RequestInit = {}) => {
-    const token = getToken();
-    if (token) {
-      const headers = new Headers(config.headers);
-      if (!headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${token}`);
+  window.fetch = (async (resource: RequestInfo | URL, config: RequestInit = {}) => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (token) {
+        const headers = new Headers(config.headers);
+        if (!headers.has('Authorization')) {
+          headers.set('Authorization', `Bearer ${token}`);
+        }
+        config = { ...config, headers };
       }
-      config = { ...config, headers };
+    } catch {
+      // If session lookup fails, fall through with no auth header —
+      // the server will return 401 and the UI can react.
     }
     return original(resource, config);
   }) as typeof window.fetch;
@@ -50,26 +55,21 @@ export default function AuthGate({ children }: AuthGateProps) {
   const [successMsg, setSuccessMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Refs to avoid stale closures inside the fetch proxy + listener
-  const tokenRef = useRef<string | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    // 1. Install the proxy exactly once, with a stable getter that always
-    //    returns the latest token.
-    cleanupRef.current = installAuthHeaderProxy(() => tokenRef.current);
+    // 1. Install the proxy once. It reads the live token from supabase
+    //    on every call, so refreshes work automatically.
+    cleanupRef.current = installAuthHeaderProxy();
 
-    // 2. Subscribe to auth changes BEFORE reading the initial session so
-    //    we don't miss a SIGNED_IN event that fires mid-startup.
+    // 2. Subscribe to auth changes (login, logout, refresh).
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
-      tokenRef.current = newSession?.access_token ?? null;
     });
 
     // 3. Read the initial session.
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       setSession(initialSession);
-      tokenRef.current = initialSession?.access_token ?? null;
       setLoading(false);
     });
 
@@ -77,7 +77,6 @@ export default function AuthGate({ children }: AuthGateProps) {
       subscription.unsubscribe();
       cleanupRef.current?.();
       cleanupRef.current = null;
-      tokenRef.current = null;
     };
   }, []);
 
