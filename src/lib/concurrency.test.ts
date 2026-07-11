@@ -148,9 +148,10 @@ describe('withRetry()', () => {
     // base=100ms: 100, 200, 400, capped at maxDelay
     const delays: number[] = [];
     const realSetTimeout = setTimeout;
-    vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn: any, ms: number) => {
-      delays.push(ms);
-      return realSetTimeout(fn, 0); // fire immediately under fake timers
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn, ms) => {
+      delays.push(ms ?? 0);
+      // Fire via real timer so vi.runAllTimersAsync drives it.
+      return realSetTimeout(fn, 0);
     });
 
     const fn = vi.fn().mockRejectedValue({ status: 429 });

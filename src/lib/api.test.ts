@@ -65,13 +65,14 @@ describe('withUser()', () => {
     });
 
     const handler = vi.fn(async () => ok({ ok: true }));
-    const wrapped = withUser(handler);
+    const wrapped = withUser(handler as any);
     const res = await wrapped(makeRequest('valid-token'));
 
     expect(res.status).toBe(200);
     expect(handler).toHaveBeenCalledOnce();
-    expect(handler.mock.calls[0][0].user.id).toBe('user-1');
-    expect(handler.mock.calls[0][0].request).toBeDefined();
+    const call = (handler.mock.calls[0] as any)?.[0] as { user: { id: string }; request: Request };
+    expect(call.user.id).toBe('user-1');
+    expect(call.request).toBeDefined();
   });
 
   it('returns 401 on UnauthorizedError', async () => {
