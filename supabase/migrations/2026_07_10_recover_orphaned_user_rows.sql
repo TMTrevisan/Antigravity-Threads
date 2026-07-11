@@ -15,16 +15,20 @@
 
 UPDATE public.garments AS g
   SET user_id = (SELECT id FROM auth.users WHERE email = 'mrtoddles11@gmail.com' LIMIT 1)
-  WHERE g.user_id IS NULL;
+  WHERE g.user_id IS NULL
+     OR g.user_id = '00000000-0000-0000-0000-000000000000';
 
 UPDATE public.wear_logs AS w
   SET user_id = (SELECT id FROM auth.users WHERE email = 'mrtoddles11@gmail.com' LIMIT 1)
-  WHERE w.user_id IS NULL;
+  WHERE w.user_id IS NULL
+     OR w.user_id = '00000000-0000-0000-0000-000000000000';
 
 UPDATE public.saved_outfits AS s
   SET user_id = (SELECT id FROM auth.users WHERE email = 'mrtoddles11@gmail.com' LIMIT 1)
-  WHERE s.user_id IS NULL;
+  WHERE s.user_id IS NULL
+     OR s.user_id = '00000000-0000-0000-0000-000000000000';
 
 UPDATE public.user_measurements AS m
   SET user_id = (SELECT id FROM auth.users WHERE email = 'mrtoddles11@gmail.com' LIMIT 1)
-  WHERE m.user_id IS NULL;
+  WHERE m.user_id IS NULL
+     OR m.user_id = '00000000-0000-0000-0000-000000000000';

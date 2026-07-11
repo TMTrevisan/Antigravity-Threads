@@ -402,7 +402,13 @@ export default function Home() {
       const res = await fetch('/api/items');
       const data = await res.json();
       const payload = data.data ?? data;
-      if (payload.items) setItems(payload.items);
+      console.log('[fetchItems] status:', res.status, 'ok:', res.ok, 'payload:', payload);
+      if (payload.items && Array.isArray(payload.items)) {
+        console.log(`[fetchItems] setting ${payload.items.length} items`);
+        setItems(payload.items);
+      } else {
+        console.warn('[fetchItems] no items array in response');
+      }
     } catch (err) {
       console.error('Failed to load items:', err);
     } finally {
