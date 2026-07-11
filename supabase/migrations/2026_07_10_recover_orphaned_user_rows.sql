@@ -18,66 +18,27 @@
 -- requires user_id IS NULL).
 -- ════════════════════════════════════════════════════════════════════════════
 
--- 1. Find the target user's UUID from their email.
-DO $$
-DECLARE
-  target_user_id UUID;
-  target_email TEXT := 'mrtoddles11@gmail.com'; -- ← change this if needed
-BEGIN
-  SELECT id INTO target_user_id
-  FROM auth.users
-  WHERE email = target_email
-  LIMIT 1;
+-- Set the target user once (change the email if you need a different user).
+WITH target AS (
+  SELECT id AS uid FROM auth.users WHERE email = 'mrtoddles11@gmail.com' LIMIT 1
+)
 
-  IF target_user_id IS NULL THEN
-    RAISE EXCEPTION 'No auth.users row found for email %', target_email;
-  END IF;
+UPDATE public.garments AS g
+  SET user_id = t.uid
+  FROM target t
+  WHERE g.user_id IS NULL;
 
-  RAISE NOTICE 'Reassigning orphaned rows to user % (%)', target_email, target_user_id;
+UPDATE public.wear_logs AS w
+  SET user_id = t.uid
+  FROM target t
+  WHERE w.user_id IS NULL;
 
-  -- 2. Reassign core tables. Each statement is independent — if one table
-  --    is missing in your environment, only its statement will error and
-  --    the rest still run.
+UPDATE public.saved_outfits AS s
+  SET user_id = t.uid
+  FROM target t
+  WHERE s.user_id IS NULL;
 
-  UPDATE public.garments
-    SET user_id = target_user_id
-    WHERE user_id IS NULL;
-  RAISE NOTICE '  garments: % rows updated', (SELECT COUNT(*) FROM public.garments WHERE user_id = target_user_id);
-
-  -- garment_images has no user_id column; rows belong to a garment, which
-  -- now carries user_id via the FK. Nothing to update here.
-
-  UPDATE public.wear_logs
-    SET user_id = target_user_id
-    WHERE user_id IS NULL;
-  RAISE NOTICE '  wear_logs: % rows updated', (SELECT COUNT(*) FROM public.wear_logs WHERE user_id = target_user_id);
-
-  UPDATE public.saved_outfits
-    SET user_id = target_user_id
-    WHERE user_id IS NULL;
-  RAISE NOTICE '  saved_outfits: % rows updated', (SELECT COUNT(*) FROM public.saved_outfits WHERE user_id = target_user_id);
-
-  UPDATE public.user_measurements
-    SET user_id = target_user_id
-    WHERE user_id IS NULL;
-  RAISE NOTICE '  user_measurements: % rows updated', (SELECT COUNT(*) FROM public.user_measurements WHERE user_id = target_user_id);
-
-  -- billing_and_token_ledger: only if it exists AND has a user_id column
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'billing_and_token_ledger'
-      AND column_name = 'user_id'
-  ) THEN
-    UPDATE public.billing_and_token_ledger
-      SET user_id = target_user_id
-      WHERE user_id IS NULL;
-    RAISE NOTICE '  billing_and_token_ledger: rows updated';
-  ELSE
-    RAISE NOTICE '  billing_and_token_ledger: skipped (table or user_id column missing)';
-  END IF;
-
-  -- weather_cache has no user_id; rows are keyed by geohash. Skip.
-
-  RAISE NOTICE 'Done. Reload the app and your clothes should be visible.';
-END $$;
+UPDATE public.user_measurements AS m
+  SET user_id = t.uid
+  FROM target t
+  WHERE m.user_id IS NULL;
