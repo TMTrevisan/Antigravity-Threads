@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Garment, WearLog } from '@/types/db';
 import { getItemWornCount, getItemCostPerWear } from '@/lib/garment-utils';
 import { garmentsToCsv, downloadCsv } from '@/lib/csv';
@@ -42,6 +42,46 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [editedItems, setEditedItems] = useState<Record<string, Partial<Garment>>>({});
   const [gridColumns, setGridColumns] = useState<1 | 2 | 3 | 4>(3);
+  const [orphanPanelOpen, setOrphanPanelOpen] = useState(false);
+  const [orphans, setOrphans] = useState<Array<{ path: string; publicUrl: string; suggestedGarmentId: string | null; fileName: string }>>([]);
+  const [orphanTarget, setOrphanTarget] = useState<Record<string, string>>({});
+
+  const loadOrphans = async () => {
+    try {
+      const res = await fetch('/api/items/repair-orphan-images');
+      const data = await res.json();
+      const payload = data.data ?? data;
+      setOrphans(payload.orphans || []);
+    } catch (err) {
+      console.error('Failed to load orphans', err);
+    }
+  };
+
+  useEffect(() => {
+    if (orphanPanelOpen) loadOrphans();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orphanPanelOpen]);
+
+  const attachOrphan = async (orphanPath: string) => {
+    const garmentId = orphanTarget[orphanPath];
+    if (!garmentId) {
+      notify.error('Pick a garment first.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/items/repair-orphan-images/attach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orphanPath, garmentId, assetType: 'detail' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Attach failed.');
+      notify.success('Image attached. Re-classify the garment to incorporate the new photo.');
+      setOrphans((prev) => prev.filter((o) => o.path !== orphanPath));
+    } catch (err: any) {
+      notify.error(`Attach failed: ${err.message}`);
+    }
+  };
 
   // Filter logic with the UI-specific category synonym map.
   const filteredItems = useMemo(() => {
@@ -375,6 +415,58 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
       {/* View: GRID */}
       {viewMode === 'grid' && (
         <>
+          {/* Orphan-image repair panel */}
+          <details
+            open={orphanPanelOpen}
+            onToggle={(e) => setOrphanPanelOpen((e.target as HTMLDetailsElement).open)}
+            className="bg-amber-50 border border-amber-200 rounded-2xl"
+          >
+            <summary className="cursor-pointer select-none px-4 py-3 flex items-center justify-between text-xs font-bold text-amber-900 hover:bg-amber-100/60 rounded-2xl">
+              <span>🩹 Repair missing detail images</span>
+              <span className="text-amber-700">{orphans.length} orphan{orphans.length === 1 ? '' : 's'} found</span>
+            </summary>
+            <div className="p-4 space-y-3 border-t border-amber-200">
+              <p className="text-[10px] text-amber-800 leading-relaxed">
+                These photos exist in your wardrobe storage but aren't linked to any garment (likely from an upload that failed mid-way before the multi-user fix).
+                Pick a garment for each and click Attach, then re-classify that garment.
+              </p>
+              {orphans.length === 0 ? (
+                <p className="text-[10px] text-stone-500 italic">No orphans. Your wardrobe is healthy. 🎉</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {orphans.map((orphan) => (
+                    <div key={orphan.path} className="bg-white border border-amber-200 rounded-xl p-2 flex items-center gap-3">
+                      <img src={orphan.publicUrl} alt="" className="w-14 h-14 object-cover rounded-md shrink-0" />
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <p className="text-[10px] font-mono text-stone-600 truncate" title={orphan.path}>{orphan.fileName}</p>
+                        <select
+                          value={orphanTarget[orphan.path] || orphan.suggestedGarmentId || ''}
+                          onChange={(e) => setOrphanTarget({ ...orphanTarget, [orphan.path]: e.target.value })}
+                          className="w-full text-[10px] bg-[#FAF8F5] border border-[#EAE5D9] rounded-md px-2 py-1"
+                        >
+                          <option value="">— Pick garment —</option>
+                          {items.map((it) => (
+                            <option key={it.id} value={it.id}>
+                              {it.brand || 'No Brand'} · {it.sub_category} ({it.color_family})
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => attachOrphan(orphan.path)}
+                          disabled={!orphanTarget[orphan.path] && !orphan.suggestedGarmentId}
+                          className="w-full px-2 py-1 bg-[var(--accent-terracotta)] text-white text-[10px] font-bold rounded-md hover:bg-[var(--accent-terracotta)]/90 disabled:opacity-40"
+                        >
+                          Attach to selected
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+
           {filteredItems.length === 0 ? (
             <div className="text-center py-12 text-[var(--text-secondary)]">
               <span className="text-3xl">🪡</span>
@@ -415,7 +507,7 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
                       className={`polaroid-frame p-2 group cursor-pointer transition ${
                         selectedItemIds.includes(item.id) ? 'ring-2 ring-[var(--accent-terracotta)]' : ''
                       }`}
-                      onClick={() => onEdit(item)}
+                      onClick={() => handleSelectItem(item.id)}
                     >
                       <div className="relative aspect-square w-full overflow-hidden bg-stone-100 rounded-sm">
                         {item.primary_image_url ? (
@@ -434,10 +526,10 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
                           }}
                           onMouseDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
-                          className={`absolute top-2 left-2 w-7 h-7 rounded-full border-2 flex items-center justify-center text-base font-bold transition shadow-md ${
+                          className={`absolute top-2 left-2 w-8 h-8 rounded-full border-2 flex items-center justify-center text-lg font-black transition shadow-md z-10 ${
                             selectedItemIds.includes(item.id)
                               ? 'bg-[var(--accent-terracotta)] border-[var(--accent-terracotta)] text-white'
-                              : 'bg-white/95 border-[#EAE5D9] text-transparent hover:border-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]/40'
+                              : 'bg-white/95 border-[#EAE5D9] text-transparent hover:text-[var(--accent-terracotta)]/30 hover:border-[var(--accent-terracotta)]'
                           }`}
                           aria-label={selectedItemIds.includes(item.id) ? `Deselect ${item.sub_category}` : `Select ${item.sub_category}`}
                           title={selectedItemIds.includes(item.id) ? 'Deselect' : 'Select for bulk action'}
@@ -452,11 +544,25 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
                             handleReclassify(item.id);
                           }}
                           onMouseDown={(e) => e.stopPropagation()}
-                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/95 border border-[#EAE5D9] text-stone-500 hover:bg-[var(--accent-apricot)] hover:text-[var(--text-primary)] flex items-center justify-center text-xs font-bold shadow-md transition"
+                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/95 border border-[#EAE5D9] text-stone-500 hover:bg-[var(--accent-apricot)] hover:text-[var(--text-primary)] flex items-center justify-center text-xs shadow-md transition z-10"
                           aria-label={`Re-classify ${item.sub_category} with AI`}
-                          title="Re-classify with AI (uses all images, 1 token)"
+                          title="Re-classify with AI (uses all images)"
                         >
                           🔄
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onEdit(item);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/95 border border-[#EAE5D9] text-[var(--accent-terracotta)] hover:bg-[var(--accent-terracotta)] hover:text-white flex items-center justify-center text-sm shadow-md transition z-10"
+                          aria-label={`Edit ${item.sub_category}`}
+                          title="Open edit modal"
+                        >
+                          ✏️
                         </button>
                       </div>
                       <div className="px-1 pt-2 pb-1 space-y-0.5">
