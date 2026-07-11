@@ -46,9 +46,9 @@ export function useToasts(): ToastApi {
   return ctx;
 }
 
-export function useConfirm(): ConfirmApi['confirm'] {
+export function useConfirmAction(): ConfirmApi['confirm'] {
   const ctx = useContext(ConfirmCtx);
-  if (!ctx) throw new Error('useConfirm() must be used within <Toaster />');
+  if (!ctx) throw new Error('useConfirmAction() must be used within <Toaster />');
   return ctx.confirm;
 }
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import AuthGate from '@/components/AuthGate';
-import { Toaster, useToasts, useConfirm } from '@/components/Toaster';
+import { Toaster, useToasts, useConfirmAction } from '@/components/Toaster';
 
 interface GarmentImage {
   id: string;
@@ -77,7 +77,7 @@ interface IngestGroup {
 
 export default function Home() {
   const notify = useToasts();
-  const confirm = useConfirm();
+  const confirmAction = useConfirmAction();
   const [activeTab, setActiveTab] = useState<'snap' | 'closet' | 'spreadsheet' | 'stylist' | 'metrics'>('snap');
   const [closetSubTab, setClosetSubTab] = useState<'items' | 'outfits' | 'locker' | 'analytics' | 'guide'>('items');
   const [editedItems, setEditedItems] = useState<Record<string, Partial<Garment>>>({});
@@ -247,7 +247,7 @@ export default function Home() {
       notify.error('Target garment not found.');
       return;
     }
-    const ok = await confirm({
+    const ok = await confirmAction({
       title: 'Merge garments?',
       description: `This will migrate all photos, wear counts, and outfit pairings from ${editingItem.brand || 'Unknown'} ${editingItem.sub_category} into ${targetItem.brand || 'Unknown'} ${targetItem.sub_category}, then permanently delete the source garment. This cannot be undone.`,
       confirmLabel: 'Merge',
@@ -626,7 +626,7 @@ export default function Home() {
   };
 
   const handleDeleteSpreadsheetRow = async (id: string) => {
-    const ok = await confirm({
+    const ok = await confirmAction({
       title: 'Delete this garment?',
       description: 'This permanently removes the item and all its images. Saved outfits that reference it will be cleaned up automatically.',
       confirmLabel: 'Delete',
