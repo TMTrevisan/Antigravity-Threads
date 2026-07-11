@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireUser, UnauthorizedError } from '@/lib/supabase';
+import { ok } from '@/lib/api';
 
 export async function POST(request: Request) {
   try {
@@ -107,8 +108,7 @@ export async function POST(request: Request) {
     // Find the primary profile image url for UI fallback
     const primaryImg = registeredImages.find(img => img.is_primary_profile) || registeredImages[0];
 
-    return NextResponse.json({
-      success: true,
+    return ok({
       item: {
         ...garment,
         images: registeredImages,

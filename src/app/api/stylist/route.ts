@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { logTelemetry } from '@/lib/telemetry';
+import { ok } from '@/lib/api';
 
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
 const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
     const candidatesTokens = response.usageMetadata?.candidatesTokenCount || 0;
     await logTelemetry('Gemini_Stylist_Engine', promptTokens, candidatesTokens, { itemsCount: activeItems.length });
 
-    return NextResponse.json({ success: true, recommendations });
+    return ok({ recommendations });
   } catch (error: any) {
     console.error('Stylist endpoint error:', error);
     return NextResponse.json(

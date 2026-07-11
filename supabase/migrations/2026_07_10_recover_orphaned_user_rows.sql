@@ -62,12 +62,19 @@ BEGIN
     WHERE user_id IS NULL;
   RAISE NOTICE '  user_measurements: % rows updated', (SELECT COUNT(*) FROM public.user_measurements WHERE user_id = target_user_id);
 
-  -- billing_and_token_ledger: same pattern
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'billing_and_token_ledger') THEN
+  -- billing_and_token_ledger: only if it exists AND has a user_id column
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'billing_and_token_ledger'
+      AND column_name = 'user_id'
+  ) THEN
     UPDATE public.billing_and_token_ledger
       SET user_id = target_user_id
       WHERE user_id IS NULL;
     RAISE NOTICE '  billing_and_token_ledger: rows updated';
+  ELSE
+    RAISE NOTICE '  billing_and_token_ledger: skipped (table or user_id column missing)';
   END IF;
 
   -- weather_cache has no user_id; rows are keyed by geohash. Skip.

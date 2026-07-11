@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ok } from '@/lib/api';
 
 export async function POST(request: Request) {
   try {
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     const base64Data = Buffer.from(arrayBuffer).toString('base64');
     const dataUrl = `data:image/jpeg;base64,${base64Data}`;
 
-    return NextResponse.json({ success: true, url: dataUrl });
+    return ok({ url: dataUrl });
   } catch (error: any) {
     console.error('Generative outfit API error:', error);
     return NextResponse.json({ error: error.message || 'An error occurred during image generation' }, { status: 500 });

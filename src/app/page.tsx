@@ -99,10 +99,11 @@ export default function Home() {
         body: formData
       });
       const data = await res.json();
+      const payload = data.data ?? data;
       if (res.ok) {
         setEditingItem({
           ...editingItem,
-          images: data.images
+          images: payload.images
         });
         await fetchItems();
       } else {
@@ -173,12 +174,13 @@ export default function Home() {
         })
       });
       const data = await res.json();
+      const payload = data.data ?? data;
       if (res.ok) {
-        const primaryUrl = data.images.find((img: any) => img.is_primary_profile)?.storage_path || editingItem.primary_image_url;
+        const primaryUrl = payload.images.find((img: any) => img.is_primary_profile)?.storage_path || editingItem.primary_image_url;
         setEditingItem({
           ...editingItem,
           primary_image_url: primaryUrl,
-          images: data.images
+          images: payload.images
         });
         await fetchItems();
       } else {
@@ -204,10 +206,11 @@ export default function Home() {
         })
       });
       const data = await res.json();
+      const payload = data.data ?? data;
       if (res.ok) {
         setEditingItem({
           ...editingItem,
-          images: data.images
+          images: payload.images
         });
         await fetchItems();
       } else {
@@ -317,7 +320,8 @@ export default function Home() {
     try {
       const res = await fetch('/api/measurements');
       const data = await res.json();
-      if (data.measurements) setMeasurements(data.measurements);
+      const payload = data.data ?? data;
+      if (payload.measurements) setMeasurements(payload.measurements);
     } catch (err) {
       console.error('Failed to load measurements:', err);
     } finally {
@@ -368,10 +372,11 @@ export default function Home() {
             })
           });
           const data = await res.json();
+          const payload = data.data ?? data;
           if (res.ok) {
             setEditingItem({
               ...editingItem,
-              images: data.images
+              images: payload.images
             });
             await fetchItems();
           } else {
@@ -396,7 +401,8 @@ export default function Home() {
     try {
       const res = await fetch('/api/items');
       const data = await res.json();
-      if (data.items) setItems(data.items);
+      const payload = data.data ?? data;
+      if (payload.items) setItems(payload.items);
     } catch (err) {
       console.error('Failed to load items:', err);
     } finally {
@@ -471,7 +477,8 @@ export default function Home() {
     try {
       const res = await fetch('/api/items/wear');
       const data = await res.json();
-      if (data.logs) setWearLogs(data.logs);
+      const payload = data.data ?? data;
+      if (payload.logs) setWearLogs(payload.logs);
     } catch (err) {
       console.error('Failed to load wear logs:', err);
     }
@@ -482,7 +489,8 @@ export default function Home() {
     try {
       const res = await fetch('/api/outfits');
       const data = await res.json();
-      if (data.outfits) setSavedOutfits(data.outfits);
+      const payload = data.data ?? data;
+      if (payload.outfits) setSavedOutfits(payload.outfits);
     } catch (err) {
       console.error('Failed to load saved outfits:', err);
     } finally {
@@ -495,9 +503,10 @@ export default function Home() {
     try {
       const res = await fetch('/api/telemetry');
       const data = await res.json();
-      if (data.success) {
-        setTelemetry(data.stats);
-        setTelemetryLogs(data.recentLogs);
+      const payload = data.data ?? data;
+      if (data.success || payload.stats) {
+        setTelemetry(payload.stats);
+        setTelemetryLogs(payload.recentLogs);
       }
     } catch (err) {
       console.error('Failed to fetch telemetry:', err);
@@ -632,12 +641,13 @@ export default function Home() {
         });
 
         const data = await res.json();
+        const payload = data.data ?? data;
         if (!res.ok) throw new Error(data.error || 'Upload failed');
 
-        successfullyUploadedIds.push(data.item.id);
-        
+        successfullyUploadedIds.push(payload.item.id);
+
         // Insert item in local state
-        setItems(prev => [data.item, ...prev]);
+        setItems(prev => [payload.item, ...prev]);
 
         setIngestGroups(prev => prev.map((g, idx) => idx === index ? { ...g, status: 'processing' } : g));
       } catch (err: any) {
@@ -694,6 +704,7 @@ export default function Home() {
       });
 
       const data = await res.json();
+      const payload = data.data ?? data;
       if (!res.ok) throw new Error(data.error || 'Upload failed');
 
       // Set status to processing
@@ -703,16 +714,16 @@ export default function Home() {
       const processRes = await fetch('/api/ingest/batch-process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [data.item.id] }),
+        body: JSON.stringify({ ids: [payload.item.id] }),
       });
-      
+
       const processData = await processRes.json();
       if (!processRes.ok) throw new Error(processData.error || 'Processing failed');
 
       setIngestGroups(prev => prev.map(g => g.id === groupId ? { ...g, status: 'done' } : g));
-      
+
       // Auto-validate if successful
-      const successItem = items.find(i => i.id === data.item.id);
+      const successItem = items.find(i => i.id === payload.item.id);
       if (successItem) setValidationTarget(successItem);
 
       await fetchItems();
@@ -749,8 +760,9 @@ export default function Home() {
 
       if (res.ok) {
         const data = await res.json();
-        setItems(prev => prev.map(item => item.id === data.item.id ? data.item : item));
-        
+        const payload = data.data ?? data;
+        setItems(prev => prev.map(item => item.id === payload.item.id ? payload.item : item));
+
         const nextTarget = items.find(item => item.status === 'Processing' && item.id !== validationTarget.id);
         setValidationTarget(nextTarget || null);
       } else {
@@ -804,7 +816,8 @@ export default function Home() {
 
         if (res.ok) {
           const data = await res.json();
-          setItems(prev => prev.map(item => item.id === data.item.id ? data.item : item));
+          const payload = data.data ?? data;
+          setItems(prev => prev.map(item => item.id === payload.item.id ? payload.item : item));
           const nextTarget = items.find(item => item.status === 'Processing' && item.id !== validationTarget.id);
           setValidationTarget(nextTarget || null);
         } else {
@@ -938,7 +951,7 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Stylist processing failed.');
 
-      setStylistResult(data.recommendations);
+      setStylistResult((data.data ?? data).recommendations);
       fetchTelemetry();
     } catch (err: any) {
       console.error(err);
@@ -1469,7 +1482,7 @@ export default function Home() {
                                 });
                                 const data = await res.json();
                                 if (res.ok) {
-                                  setSearchResults(data.images || []);
+                                  setSearchResults((data.data ?? data).images || []);
                                 } else {
                                   notify.error(`Search failed: ${data.error || 'Unknown error'}`);
                                 }
@@ -1519,12 +1532,13 @@ export default function Home() {
                                           }),
                                         });
                                         const data = await res.json();
+                                        const payload = data.data ?? data;
                                         if (res.ok) {
                                           setValidationTarget({
                                             ...validationTarget,
-                                            primary_image_url: data.url,
+                                            primary_image_url: payload.url,
                                             images: validationTarget.images.map((gImg: any) =>
-                                              gImg.is_primary_profile ? { ...gImg, storage_path: data.url } : gImg
+                                              gImg.is_primary_profile ? { ...gImg, storage_path: payload.url } : gImg
                                             )
                                           });
                                           await fetchItems();
@@ -4181,7 +4195,7 @@ export default function Home() {
                             });
                             const data = await res.json();
                             if (res.ok) {
-                              setVisualModal({ ...visualModal, genUrl: data.url, loading: false });
+                              setVisualModal({ ...visualModal, genUrl: (data.data ?? data).url, loading: false });
                             } else {
                               notify.error(`Generation failed: ${data.error || 'Check server logs.'}`);
                               setVisualModal({ ...visualModal, loading: false });
@@ -4305,10 +4319,11 @@ export default function Home() {
                                 }),
                               });
                               const data = await res.json();
+                              const payload = data.data ?? data;
                               if (res.ok) {
-                                setVisualModal({ ...visualModal, genUrl: data.url, loading: false });
-                                if (data.isMock) {
-                                  notify.info(`Demo Try-On Output:\n\n${data.message}`);
+                                setVisualModal({ ...visualModal, genUrl: payload.url, loading: false });
+                                if (payload.isMock) {
+                                  notify.info(`Demo Try-On Output:\n\n${payload.message}`);
                                 }
                               } else {
                                 notify.error(`Try-on failed: ${data.error || 'Check server logs.'}`);
@@ -4367,7 +4382,8 @@ export default function Home() {
                 });
                 if (res.ok) {
                   const data = await res.json();
-                  setItems(prev => prev.map(i => i.id === data.item.id ? data.item : i));
+                  const payload = data.data ?? data;
+                  setItems(prev => prev.map(i => i.id === payload.item.id ? payload.item : i));
                   setEditingItem(null);
                 }
               } catch (err) {
@@ -4430,7 +4446,7 @@ export default function Home() {
                             });
                             const data = await res.json();
                             if (res.ok) {
-                              setSearchResults(data.images || []);
+                              setSearchResults((data.data ?? data).images || []);
                             } else {
                               notify.error(`Search failed: ${data.error || 'Unknown error'}`);
                             }

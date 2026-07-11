@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ok } from '@/lib/api';
 
 export async function POST(request: Request) {
   try {
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Virtual Try-On timed out. Try again later.' }, { status: 504 });
     }
 
-    return NextResponse.json({ success: true, url: resultUrl });
+    return ok({ url: resultUrl });
   } catch (error: any) {
     console.error('VTON API error:', error);
     return NextResponse.json({ error: error.message || 'An error occurred during virtual try-on' }, { status: 500 });
