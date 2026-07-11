@@ -218,6 +218,31 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
     }
   };
 
+  /**
+   * Re-classify a single item. The server uses ALL garment_images
+   * (primary + every detail shot — fabric, tags, sizing labels) when
+   * re-running Gemini, so fabric content and brand labels contribute.
+   */
+  const handleReclassify = async (id: string) => {
+    console.log('[ClosetReclassify] start', id);
+    notify.info('Re-classifying with AI… (uses all images)');
+    try {
+      const res = await fetch('/api/ingest/batch-process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Re-classify failed.');
+      }
+      notify.success('Re-classification complete. Refresh the closet to see updated tags.');
+    } catch (err: any) {
+      console.error('[ClosetReclassify] error', err);
+      notify.error(`Re-classify failed: ${err.message}`);
+    }
+  };
+
   const handleExportCSV = () => {
     const csv = garmentsToCsv(items, (id) => getItemWornCount(id, wearLogs));
     downloadCsv(csv, 'threads_wardrobe_export.csv');
@@ -404,16 +429,34 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            e.preventDefault();
                             handleSelectItem(item.id);
                           }}
-                          className={`absolute top-1.5 left-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] transition ${
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          className={`absolute top-2 left-2 w-7 h-7 rounded-full border-2 flex items-center justify-center text-base font-bold transition shadow-md ${
                             selectedItemIds.includes(item.id)
                               ? 'bg-[var(--accent-terracotta)] border-[var(--accent-terracotta)] text-white'
-                              : 'bg-white/80 border-[#EAE5D9] text-transparent'
+                              : 'bg-white/95 border-[#EAE5D9] text-transparent hover:border-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]/40'
                           }`}
-                          aria-label={selectedItemIds.includes(item.id) ? 'Deselect' : 'Select'}
+                          aria-label={selectedItemIds.includes(item.id) ? `Deselect ${item.sub_category}` : `Select ${item.sub_category}`}
+                          title={selectedItemIds.includes(item.id) ? 'Deselect' : 'Select for bulk action'}
                         >
                           ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            handleReclassify(item.id);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/95 border border-[#EAE5D9] text-stone-500 hover:bg-[var(--accent-apricot)] hover:text-[var(--text-primary)] flex items-center justify-center text-xs font-bold shadow-md transition"
+                          aria-label={`Re-classify ${item.sub_category} with AI`}
+                          title="Re-classify with AI (uses all images, 1 token)"
+                        >
+                          🔄
                         </button>
                       </div>
                       <div className="px-1 pt-2 pb-1 space-y-0.5">

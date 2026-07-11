@@ -39,6 +39,10 @@ export const POST = withUser(async ({ user, request }) => {
       if (imagesList.length === 0) {
         throw new Error(`No images registered for garment ${id}.`);
       }
+      console.log(
+        `[batch-process] garment ${id}: sending ${imagesList.length} image(s) to Gemini`,
+        imagesList.map((i: any) => i.asset_type || 'unknown')
+      );
 
       // 2. Fetch all images into base64 (concurrently).
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
