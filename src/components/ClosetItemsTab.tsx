@@ -292,6 +292,10 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
     <div className="space-y-6">
       {/* Filters bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border border-[#EAE5D9] bg-white rounded-3xl shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Closet</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] font-bold">v2.40.0</span>
+        </div>
         <div className="flex-1 min-w-[200px]">
           <input
             type="text"

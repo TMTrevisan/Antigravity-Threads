@@ -2509,7 +2509,7 @@ export default function Home() {
 
         <footer className="mt-12 lg:mt-16 border-t border-[#EAE5D9] pt-4 pb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-[10px] text-[var(--text-secondary)] font-bold">
           <span>© 2026 Antigravity Threads</span>
-          <span className="opacity-60">v2.31.0</span>
+          <span className="opacity-60">v2.40.0</span>
         </footer>
 
       {/* TELEMETRY DRAWER */}
@@ -2935,7 +2935,8 @@ export default function Home() {
                       notify.error(`Re-process failed: ${err.message}`);
                     }
                   }}
-                  className="text-[10px] font-extrabold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-[var(--accent-apricot)] text-[var(--text-primary)] hover:bg-[var(--accent-apricot)]/80 transition active:scale-95"
+                  className="text-xs font-extrabold uppercase tracking-wider px-4 py-2 rounded-xl bg-[var(--accent-apricot)] text-[var(--text-primary)] hover:bg-[var(--accent-apricot)]/80 transition active:scale-95 shadow-sm border border-[var(--accent-apricot)]/40"
+                  title="Re-run Gemini on all images (uses 1 token)"
                 >
                   🔄 Re-classify with AI
                 </button>
