@@ -3972,8 +3972,9 @@ export default function Home() {
 
         </section>
 
-        <footer className="mt-16 border-t border-[#EAE5D9] pt-8 pb-12 text-center text-[10px] text-[var(--text-secondary)] font-bold">
-          <p>© 2026 Antigravity Threads • v2.31.0 Release</p>
+        <footer className="mt-12 lg:mt-16 border-t border-[#EAE5D9] pt-4 pb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-[10px] text-[var(--text-secondary)] font-bold">
+          <span>© 2026 Antigravity Threads</span>
+          <span className="opacity-60">v2.31.0</span>
         </footer>
       </main>
 
