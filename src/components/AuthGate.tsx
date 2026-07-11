@@ -1,10 +1,43 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface AuthGateProps {
   children: React.ReactNode;
+}
+
+/**
+ * Installs a global `window.fetch` proxy that injects the current Supabase
+ * access token as a Bearer header on every request. The original `fetch` is
+ * captured once and restored on cleanup.
+ *
+ * Notes / pitfalls this avoids:
+ *  - Previously the proxy was re-installed on every session change AND every
+ *    initial `getSession` call, which double-wrapped the proxy and never
+ *    unwrapped it on sign-out (subsequent requests kept carrying a stale or
+ *    undefined Bearer header).
+ *  - We hold the *latest* token in a ref so the proxy always sees the
+ *    current value rather than the value captured at install time.
+ *  - We never throw if the token is missing; we simply skip header injection.
+ */
+function installAuthHeaderProxy(getToken: () => string | null): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const original = window.fetch.bind(window);
+  window.fetch = ((resource: RequestInfo | URL, config: RequestInit = {}) => {
+    const token = getToken();
+    if (token) {
+      const headers = new Headers(config.headers);
+      if (!headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+      config = { ...config, headers };
+    }
+    return original(resource, config);
+  }) as typeof window.fetch;
+  return () => {
+    window.fetch = original;
+  };
 }
 
 export default function AuthGate({ children }: AuthGateProps) {
@@ -17,59 +50,34 @@ export default function AuthGate({ children }: AuthGateProps) {
   const [successMsg, setSuccessMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Refs to avoid stale closures inside the fetch proxy + listener
+  const tokenRef = useRef<string | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
-    // 1. Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      // Inject Authorization Bearer token into global fetch headers
-      if (session?.access_token) {
-        window.fetch = new Proxy(window.fetch, {
-          apply(target, thisArg, argumentsList) {
-            const [resource, config = {}] = argumentsList;
-            if (config.headers === undefined) {
-              config.headers = {};
-            }
-            if (config.headers instanceof Headers) {
-              config.headers.set('Authorization', `Bearer ${session.access_token}`);
-            } else if (Array.isArray(config.headers)) {
-              config.headers.push(['Authorization', `Bearer ${session.access_token}`]);
-            } else {
-              config.headers['Authorization'] = `Bearer ${session.access_token}`;
-            }
-            argumentsList[1] = config;
-            return Reflect.apply(target, thisArg, argumentsList);
-          }
-        });
-      }
-      setLoading(false);
+    // 1. Install the proxy exactly once, with a stable getter that always
+    //    returns the latest token.
+    cleanupRef.current = installAuthHeaderProxy(() => tokenRef.current);
+
+    // 2. Subscribe to auth changes BEFORE reading the initial session so
+    //    we don't miss a SIGNED_IN event that fires mid-startup.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      tokenRef.current = newSession?.access_token ?? null;
     });
 
-    // 2. Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session?.access_token) {
-        window.fetch = new Proxy(window.fetch, {
-          apply(target, thisArg, argumentsList) {
-            const [resource, config = {}] = argumentsList;
-            if (config.headers === undefined) {
-              config.headers = {};
-            }
-            if (config.headers instanceof Headers) {
-              config.headers.set('Authorization', `Bearer ${session.access_token}`);
-            } else if (Array.isArray(config.headers)) {
-              config.headers.push(['Authorization', `Bearer ${session.access_token}`]);
-            } else {
-              config.headers['Authorization'] = `Bearer ${session.access_token}`;
-            }
-            argumentsList[1] = config;
-            return Reflect.apply(target, thisArg, argumentsList);
-          }
-        });
-      }
+    // 3. Read the initial session.
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      tokenRef.current = initialSession?.access_token ?? null;
+      setLoading(false);
     });
 
     return () => {
       subscription.unsubscribe();
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      tokenRef.current = null;
     };
   }, []);
 
@@ -124,8 +132,9 @@ export default function AuthGate({ children }: AuthGateProps) {
 
           <form onSubmit={handleAuth} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Email Address</label>
+              <label htmlFor="auth-email" className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Email Address</label>
               <input
+                id="auth-email"
                 type="email"
                 required
                 value={email}
@@ -136,8 +145,9 @@ export default function AuthGate({ children }: AuthGateProps) {
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Locker Password</label>
+              <label htmlFor="auth-password" className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Locker Password</label>
               <input
+                id="auth-password"
                 type="password"
                 required
                 value={password}
@@ -148,13 +158,13 @@ export default function AuthGate({ children }: AuthGateProps) {
             </div>
 
             {errorMsg && (
-              <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-xs font-bold leading-relaxed">
+              <div role="alert" className="p-3.5 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-xs font-bold leading-relaxed">
                 ⚠️ {errorMsg}
               </div>
             )}
 
             {successMsg && (
-              <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-bold leading-relaxed">
+              <div role="status" className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-bold leading-relaxed">
                 ✉️ {successMsg}
               </div>
             )}

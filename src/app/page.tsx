@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import AuthGate from '@/components/AuthGate';
+import { Toaster, useToasts, useConfirm } from '@/components/Toaster';
 
 interface GarmentImage {
   id: string;
@@ -75,6 +76,8 @@ interface IngestGroup {
 }
 
 export default function Home() {
+  const notify = useToasts();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'snap' | 'closet' | 'spreadsheet' | 'stylist' | 'metrics'>('snap');
   const [closetSubTab, setClosetSubTab] = useState<'items' | 'outfits' | 'locker' | 'analytics' | 'guide'>('items');
   const [editedItems, setEditedItems] = useState<Record<string, Partial<Garment>>>({});
@@ -236,17 +239,21 @@ export default function Home() {
   const handleMergeGarments = async () => {
     if (!editingItem || !mergeTargetGarmentId) return;
     if (editingItem.id === mergeTargetGarmentId) {
-      alert('Cannot merge a garment into itself.');
+      notify.error('Cannot merge a garment into itself.');
       return;
     }
     const targetItem = items.find(i => i.id === mergeTargetGarmentId);
     if (!targetItem) {
-      alert('Target garment not found.');
+      notify.error('Target garment not found.');
       return;
     }
-    if (!confirm(`Are you sure you want to merge this garment (${editingItem.brand || 'Unknown'} ${editingItem.sub_category}) into ${targetItem.brand || 'Unknown'} ${targetItem.sub_category}? This will migrate all photos, wear counts, and outfit pairings, and then permanently delete this current garment.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Merge garments?',
+      description: `This will migrate all photos, wear counts, and outfit pairings from ${editingItem.brand || 'Unknown'} ${editingItem.sub_category} into ${targetItem.brand || 'Unknown'} ${targetItem.sub_category}, then permanently delete the source garment. This cannot be undone.`,
+      confirmLabel: 'Merge',
+      destructive: true,
+    });
+    if (!ok) return;
     
     setIsMergingGarments(true);
     try {
@@ -260,15 +267,15 @@ export default function Home() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert('Garments merged successfully!');
+        notify.success('Garments merged successfully!');
         setEditingItem(null);
         setMergeTargetGarmentId('');
         await fetchItems();
       } else {
-        alert(`Merge failed: ${data.error || 'Unknown error'}`);
+        notify.error(`Merge failed: ${data.error || 'Unknown error'}`);
       }
     } catch (err: any) {
-      alert(`Error during merge: ${err.message}`);
+      notify.error(`Error during merge: ${err.message}`);
     } finally {
       setIsMergingGarments(false);
     }
@@ -619,18 +626,26 @@ export default function Home() {
   };
 
   const handleDeleteSpreadsheetRow = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this garment?')) return;
+    const ok = await confirm({
+      title: 'Delete this garment?',
+      description: 'This permanently removes the item and all its images. Saved outfits that reference it will be cleaned up automatically.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/items?id=${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {
+        notify.success('Garment deleted.');
         await fetchItems();
       } else {
-        alert('Failed to delete item.');
+        const data = await res.json().catch(() => ({}));
+        notify.error(`Failed to delete item: ${data.error || res.statusText}`);
       }
     } catch (err: any) {
-      alert(`Delete error: ${err.message}`);
+      notify.error(`Delete error: ${err.message}`);
     }
   };
 
@@ -1324,8 +1339,9 @@ export default function Home() {
   });
 
   return (
-    <AuthGate>
-      <div className="flex-1 flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] min-h-screen">
+    <Toaster>
+      <AuthGate>
+        <div className="flex-1 flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] min-h-screen">
         
         {/* HIDDEN FILE INPUT FOR DETAIL IMAGES */}
         <input 
@@ -5276,6 +5292,7 @@ export default function Home() {
         </div>
       )}
       </div>
-    </AuthGate>
+      </AuthGate>
+    </Toaster>
   );
 }

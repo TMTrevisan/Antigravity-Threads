@@ -1,43 +1,40 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { withUser } from '@/lib/api';
+import { fail, ok } from '@/lib/api';
 
-export async function PATCH(request: Request) {
-  try {
-    const { garmentId, imageId } = await request.json();
+export const PATCH = withUser(async ({ user, request }) => {
+  const { garmentId, imageId } = await request.json();
+  if (!garmentId || !imageId) return fail(400, 'Missing garmentId or imageId.');
 
-    if (!garmentId || !imageId) {
-      return NextResponse.json({ error: 'Missing garmentId or imageId.' }, { status: 400 });
-    }
+  // 0. Verify ownership of the garment before mutating its images.
+  const { data: garment, error: ownErr } = await user.client
+    .from('garments')
+    .select('id')
+    .eq('id', garmentId)
+    .single();
+  if (ownErr || !garment) return fail(404, 'Garment not found.');
 
-    // 1. Set all other images for this garment as not primary
-    const { error: resetError } = await supabase
-      .from('garment_images')
-      .update({ is_primary_profile: false })
-      .eq('garment_id', garmentId);
+  // 1. Reset all images for this garment as not primary.
+  const { error: resetError } = await user.client
+    .from('garment_images')
+    .update({ is_primary_profile: false })
+    .eq('garment_id', garmentId);
 
-    if (resetError) {
-      return NextResponse.json({ error: `Reset primary failed: ${resetError.message}` }, { status: 500 });
-    }
+  if (resetError) return fail(500, `Reset primary failed: ${resetError.message}`);
 
-    // 2. Set the chosen image as primary
-    const { error: setError } = await supabase
-      .from('garment_images')
-      .update({ is_primary_profile: true })
-      .eq('id', imageId);
+  // 2. Promote the chosen image.
+  const { error: setError } = await user.client
+    .from('garment_images')
+    .update({ is_primary_profile: true })
+    .eq('id', imageId);
 
-    if (setError) {
-      return NextResponse.json({ error: `Set primary failed: ${setError.message}` }, { status: 500 });
-    }
+  if (setError) return fail(500, `Set primary failed: ${setError.message}`);
 
-    // 3. Return updated images list
-    const { data: updatedImages } = await supabase
-      .from('garment_images')
-      .select('*')
-      .eq('garment_id', garmentId);
+  // 3. Return the updated list.
+  const { data: updatedImages } = await user.client
+    .from('garment_images')
+    .select('*')
+    .eq('garment_id', garmentId);
 
-    return NextResponse.json({ success: true, images: updatedImages });
-  } catch (error: any) {
-    console.error('Set primary image error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred setting primary image' }, { status: 500 });
-  }
-}
+  return ok({ images: updatedImages });
+});

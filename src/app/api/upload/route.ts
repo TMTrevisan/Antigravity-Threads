@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { requireUser, UnauthorizedError } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
+    const user = await requireUser(request);
     const formData = await request.formData();
     
     // Find all files in form data (e.g. image_0, image_1, etc.)
@@ -20,10 +21,11 @@ export async function POST(request: Request) {
     }
 
     // 1. Insert a single garment entry in 'Processing' status
-    const { data: garment, error: dbError } = await supabase
+    const { data: garment, error: dbError } = await user.client
       .from('garments')
       .insert([
         {
+          user_id: user.id,
           category: 'Tops', // Temporary fallback
           sub_category: 'Processing...',
           color_family: 'Extracting...',
@@ -64,7 +66,7 @@ export async function POST(request: Request) {
       const fileName = `${garment.id}-${index}-${Date.now()}.${fileExtension}`;
       const filePath = `raw/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await user.client.storage
         .from('wardrobe-images')
         .upload(filePath, buffer, {
           contentType: file.type,
@@ -75,12 +77,12 @@ export async function POST(request: Request) {
         throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
       }
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = user.client.storage
         .from('wardrobe-images')
         .getPublicUrl(filePath);
 
       // Save record in garment_images
-      const { data: imgRecord, error: imgError } = await supabase
+      const { data: imgRecord, error: imgError } = await user.client
         .from('garment_images')
         .insert([
           {
@@ -114,6 +116,9 @@ export async function POST(request: Request) {
       },
     });
   } catch (error: any) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('Upload handler error:', error);
     return NextResponse.json(
       { error: error.message || 'An error occurred during multi-image upload.' },

@@ -1,59 +1,56 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/lib/supabase';
+import { withUser } from '@/lib/api';
+import { fail, ok } from '@/lib/api';
 
-export async function GET(request: Request) {
-  try {
-    const client = getSupabaseClient(request);
-    // 1. Fetch all records from billing_and_token_ledger
-    const { data: ledger, error } = await client
-      .from('billing_and_token_ledger')
-      .select('*')
-      .order('timestamp', { ascending: false });
+export const GET = withUser(async ({ user }) => {
+  // 1. Fetch this user's ledger rows only.
+  // NOTE: this route previously used `order('timestamp', ...)`. The actual
+  // column name in production is unverified — see REVIEW.md tech-debt #12.
+  // Adjust to `created_at` here once confirmed.
+  const { data: ledger, error } = await user.client
+    .from('billing_and_token_ledger')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('timestamp', { ascending: false })
+    .limit(500);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return fail(500, error.message);
+
+  // 2. Aggregate.
+  let totalTokensIn = 0;
+  let totalTokensOut = 0;
+  let totalCost = 0;
+
+  const serviceStats: Record<string, { count: number; totalLatency: number; totalCost: number }> = {};
+
+  for (const entry of ledger || []) {
+    totalTokensIn += entry.tokens_in || 0;
+    totalTokensOut += entry.tokens_out || 0;
+    totalCost += Number(entry.estimated_cost || 0);
+
+    const service = entry.service;
+    if (!serviceStats[service]) {
+      serviceStats[service] = { count: 0, totalLatency: 0, totalCost: 0 };
     }
-
-    // 2. Perform aggregation
-    let totalTokensIn = 0;
-    let totalTokensOut = 0;
-    let totalCost = 0;
-    
-    const serviceStats: Record<string, { count: number; totalLatency: number; totalCost: number }> = {};
-
-    ledger.forEach((entry: any) => {
-      totalTokensIn += entry.tokens_in || 0;
-      totalTokensOut += entry.tokens_out || 0;
-      totalCost += Number(entry.estimated_cost || 0);
-
-      const service = entry.service;
-      if (!serviceStats[service]) {
-        serviceStats[service] = { count: 0, totalLatency: 0, totalCost: 0 };
-      }
-      serviceStats[service].count += 1;
-      serviceStats[service].totalLatency += entry.latency_ms || 100; // default/fallback latency
-      serviceStats[service].totalCost += Number(entry.estimated_cost || 0);
-    });
-
-    const services = Object.keys(serviceStats).map(key => ({
-      service: key,
-      count: serviceStats[key].count,
-      avgLatencyMs: Math.round(serviceStats[key].totalLatency / serviceStats[key].count),
-      totalCost: Number(serviceStats[key].totalCost.toFixed(6)),
-    }));
-
-    return NextResponse.json({
-      success: true,
-      stats: {
-        totalTokensIn,
-        totalTokensOut,
-        totalCost: Number(totalCost.toFixed(6)),
-        services,
-      },
-      recentLogs: ledger,
-    });
-  } catch (error: any) {
-    console.error('Telemetry query error:', error);
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    serviceStats[service].count += 1;
+    serviceStats[service].totalLatency += entry.latency_ms || 100;
+    serviceStats[service].totalCost += Number(entry.estimated_cost || 0);
   }
-}
+
+  const services = Object.keys(serviceStats).map((key) => ({
+    service: key,
+    count: serviceStats[key].count,
+    avgLatencyMs: Math.round(serviceStats[key].totalLatency / serviceStats[key].count),
+    totalCost: Number(serviceStats[key].totalCost.toFixed(6)),
+  }));
+
+  return ok({
+    stats: {
+      totalTokensIn,
+      totalTokensOut,
+      totalCost: Number(totalCost.toFixed(6)),
+      services,
+    },
+    recentLogs: ledger,
+  });
+});

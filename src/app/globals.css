@@ -61,3 +61,18 @@ body {
   transform: rotate(1deg) scale(1.02);
 }
 
+/* Dialog fade-in keyframes (used by <Dialog>) */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Toast slide-in (used by <Toast>) */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-toast-in {
+  animation: toastIn 160ms ease-out;
+}
+

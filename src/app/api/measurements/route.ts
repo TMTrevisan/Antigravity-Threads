@@ -1,62 +1,44 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/lib/supabase';
+import { withUser } from '@/lib/api';
+import { fail, ok } from '@/lib/api';
 
-export async function GET(request: Request) {
-  try {
-    const client = getSupabaseClient(request);
-    const { data: measurements, error } = await client
-      .from('user_measurements')
-      .select('*')
-      .order('created_at', { ascending: false });
+export const GET = withUser(async ({ user }) => {
+  const { data: measurements, error } = await user.client
+    .from('user_measurements')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-    if (error) throw new Error(error.message);
-    return NextResponse.json({ success: true, measurements });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+  if (error) return fail(500, error.message);
+  return ok({ measurements });
+});
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { label, measurement_type, details } = body;
+export const POST = withUser(async ({ user, request }) => {
+  const body = await request.json();
+  const { label, measurement_type, details } = body;
 
-    if (!label || !measurement_type) {
-      return NextResponse.json({ error: 'Label and type are required.' }, { status: 400 });
-    }
+  if (!label || !measurement_type) return fail(400, 'Label and type are required.');
 
-    const client = getSupabaseClient(request);
-    const { data: measurement, error } = await client
-      .from('user_measurements')
-      .insert([{ label, measurement_type, details: details || {} }])
-      .select()
-      .single();
+  const { data: measurement, error } = await user.client
+    .from('user_measurements')
+    .insert([{ user_id: user.id, label, measurement_type, details: details || {} }])
+    .select()
+    .single();
 
-    if (error) throw new Error(error.message);
-    return NextResponse.json({ success: true, measurement });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+  if (error) return fail(500, error.message);
+  return ok({ measurement });
+});
 
-export async function DELETE(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+export const DELETE = withUser(async ({ user, request }) => {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID is required.' }, { status: 400 });
-    }
+  if (!id) return fail(400, 'ID is required.');
 
-    const client = getSupabaseClient(request);
-    const { error } = await client
-      .from('user_measurements')
-      .delete()
-      .eq('id', id);
+  const { error } = await user.client
+    .from('user_measurements')
+    .delete()
+    .eq('id', id);
 
-    if (error) throw new Error(error.message);
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+  if (error) return fail(500, error.message);
+  return ok({});
+});

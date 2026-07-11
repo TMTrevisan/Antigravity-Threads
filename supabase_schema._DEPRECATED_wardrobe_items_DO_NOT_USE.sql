@@ -1,4 +1,21 @@
--- 1. Create the wardrobe_items table
+-- ════════════════════════════════════════════════════════════════════════════
+-- ⚠️  DEPRECATED — DO NOT USE
+-- ════════════════════════════════════════════════════════════════════════════
+-- This file describes the original `wardrobe_items` table from an earlier
+-- version of Antigravity Threads. The application has since migrated to the
+-- `garments` table defined by `migration_multiuser.sql`.
+--
+-- The RLS policies here are FULLY PERMISSIVE (USING (true)) and the storage
+-- bucket described below is configured as PUBLIC. Running this file as-is
+-- would expose all wardrobe photos and metadata to anonymous users.
+--
+-- If you are setting up a fresh environment, run `migration_multiuser.sql`
+-- instead (and add migrations for `garment_images`, `saved_outfits`,
+-- `wear_logs`, `user_measurements`, `billing_and_token_ledger`,
+-- `weather_cache` — those are not yet captured in any migration file).
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- 1. Create the wardrobe_items table (LEGACY — superseded by `garments`)
 CREATE TABLE IF NOT EXISTS public.wardrobe_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     image_url TEXT NOT NULL,
