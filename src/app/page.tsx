@@ -5,6 +5,7 @@ import AuthGate from '@/components/AuthGate';
 import { useToasts, useConfirmAction } from '@/components/Toaster';
 import ChatPanel from '@/components/ChatPanel';
 import SnapTab from '@/components/SnapTab';
+import ClosetItemsTab from '@/components/ClosetItemsTab';
 import type { Garment, WearLog, SavedOutfit, StylistOutput, TelemetryStats, IngestGroup } from '@/types/db';
 import { INGEST_LIMITS } from '@/lib/constants';
 import { getItemWornCount, getItemCostPerWear, filterGarments } from '@/lib/garment-utils';
@@ -28,14 +29,7 @@ export default function Home() {
   // Validation target for AI-extracted data confirmation
   const [validationTarget, setValidationTarget] = useState<Garment | null>(null);
 
-  // Closet filtering
-  const [viewMode, setViewMode] = useState<'grid' | 'matrix'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [colorFilter, setColorFilter] = useState('All');
-  const [subcategoryFilter, setSubcategoryFilter] = useState('All');
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  // Closet filter state moved to ClosetItemsTab.
   const [editingItem, setEditingItem] = useState<Garment | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
@@ -61,8 +55,7 @@ export default function Home() {
   const [searchQueryText, setSearchQueryText] = useState('');
   const [isMergingGarments, setIsMergingGarments] = useState(false);
   const [mergeTargetGarmentId, setMergeTargetGarmentId] = useState('');
-  const [gridColumns, setGridColumns] = useState<1 | 2 | 3 | 4>(3);
-
+  
   useEffect(() => {
     if (editingItem) {
       setSearchQueryText(`${editingItem.brand || ''} ${editingItem.sub_category || ''} ${editingItem.color_family || ''}`.trim());
@@ -738,152 +731,10 @@ export default function Home() {
     }
   };
 
-  // Bulk curation
-  const handleBulkChangeStatus = async (status: Garment['status']) => {
-    if (selectedItemIds.length === 0) return;
-    try {
-      const promises = selectedItemIds.map(id => 
-        fetch('/api/items', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, status }),
-        })
-      );
-      await Promise.all(promises);
-      fetchItems();
-      setSelectedItemIds([]);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedItemIds.length === 0) return;
-    if (!confirm(`Confirm bulk deletion of ${selectedItemIds.length} garments?`)) return;
-
-    try {
-      const promises = selectedItemIds.map(id => 
-        fetch(`/api/items?id=${id}`, { method: 'DELETE' })
-      );
-      await Promise.all(promises);
-      fetchItems();
-      setSelectedItemIds([]);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSelectItem = (id: string) => {
-    setSelectedItemIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-
-  // Speech helper removed: now lives in SnapTab if re-introduced.
-
-  const filteredItems = items.filter((item) => {
-    const matchesSearch =
-      (item.sub_category?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.brand?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.color_family?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.fabric_type?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.notes?.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    // Enhance category checks:
-    // User requested: "top and a bottom and a shoe category, and then, bottom shorts, top long sleeve, top outer layer"
-    // We map UI dropdown filters to category or sub_category matching patterns.
-    let matchesCategory = true;
-    if (categoryFilter !== 'All') {
-      const catLower = categoryFilter.toLowerCase();
-      const itemCatLower = item.category.toLowerCase();
-      const itemSubLower = (item.sub_category || '').toLowerCase();
-      const itemStyleLower = (item.style_detail || '').toLowerCase();
-
-      // Match against the original category enum
-      if (['tops', 'bottoms', 'outerwear', 'footwear', 'tailoring'].includes(catLower)) {
-        matchesCategory = itemCatLower === catLower;
-      } else if (catLower === 'shoe') {
-        matchesCategory = itemCatLower === 'footwear';
-      } else if (catLower === 'bottom shorts') {
-        matchesCategory = itemCatLower === 'bottoms' && itemSubLower.includes('short');
-      } else if (catLower === 'top long sleeve' || catLower === 'long sleeve') {
-        matchesCategory = itemCatLower === 'tops' && (itemSubLower.includes('long sleeve') || itemStyleLower.includes('long sleeve'));
-      } else if (catLower === 'top outer layer' || catLower === 'outer layer') {
-        matchesCategory = itemCatLower === 'outerwear' || (itemCatLower === 'tops' && (itemStyleLower.includes('outer') || itemStyleLower.includes('layer')));
-      } else if (catLower === 'top short sleeve' || catLower === 'short sleeve') {
-        matchesCategory = itemCatLower === 'tops' && (itemSubLower.includes('short sleeve') || itemStyleLower.includes('short sleeve'));
-      }
-    }
-
-    const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
-    const matchesColor = colorFilter === 'All' || item.color_family === colorFilter;
-    const matchesSubcategory = subcategoryFilter === 'All' || item.sub_category === subcategoryFilter;
-
-    return matchesSearch && matchesCategory && matchesStatus && matchesColor && matchesSubcategory;
-  });
-
   return (
     <AuthGate>
       <div className="flex-1 flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] min-h-screen">
-
-        {/* HEADER */}
-        <header className="sticky top-0 z-45 bg-[var(--bg-main)]/95 backdrop-blur-md border-b border-[#EAE5D9] px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--bg-card-primary)] border border-[#EAE5D9] flex items-center justify-center overflow-hidden shadow-inner p-1">
-              <img src="/icon-192.png" alt="Antigravity Logo" className="w-full h-full object-contain" />
-            </div>
-            <div>
-              <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-                <span className="embroidered-logo">Antigravity Threads</span>
-                <span className="text-[10px] bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/25 px-2 py-0.5 rounded-full font-bold">v2.31.0</span>
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5">
-            {telemetry && (
-              <button 
-                onClick={() => {
-                  setShowTelemetry(!showTelemetry);
-                  if (!showTelemetry) fetchTelemetry();
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-full bg-[var(--bg-card-primary)] border border-[#EAE5D9] text-[var(--text-secondary)] hover:bg-[var(--bg-card-secondary)] transition tactile-shadow-sm"
-              >
-                📉 Cost Metrics: ${telemetry.totalCost}
-              </button>
-            )}
-            <button
-              onClick={async () => {
-                const { supabase } = await import('@/lib/supabase');
-                await supabase.auth.signOut();
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-full bg-rose-50 border border-rose-150 text-rose-600 hover:bg-rose-100/70 transition tactile-shadow-sm"
-            >
-              🔒 Sign Out
-            </button>
-          </div>
-        </header>
-
-      {/* CORE WORKSPACE */}
-      <main className={`flex-1 flex flex-col lg:flex-row w-full mx-auto p-4 sm:p-6 gap-6 mb-24 lg:mb-0 ${
-        activeTab === 'spreadsheet' ? 'max-w-[100%] lg:px-2' : 'max-w-7xl'
-      }`}>
-        
-        {/* DESKTOP SIDEBAR NAV */}
-        <aside className="hidden lg:flex flex-col w-60 gap-1.5 p-4 pr-3 bg-[var(--bg-sidebar)] rounded-3xl border border-[#DCD1C0] tactile-shadow-md self-start">
-          <p className="text-[10px] tracking-widest uppercase font-bold text-[var(--text-secondary)] px-3.5 mb-2 select-none">Atelier Navigation</p>
-          <button
-            onClick={() => setActiveTab('snap')}
-            className={`flex items-center gap-3 px-4.5 py-3 rounded-full font-bold text-xs uppercase tracking-wider transition-all duration-200 active:scale-95 ${
-              activeTab === 'snap' 
-                ? 'bg-[var(--accent-terracotta)] text-white shadow-md' 
-                : 'hover:bg-white/40 text-[var(--text-primary)]'
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            Batch Ingest
-          </button>
-          
+        <aside className="hidden lg:block w-56 shrink-0 space-y-2">
           <button
             onClick={() => setActiveTab('closet')}
             className={`flex items-center gap-3 px-4.5 py-3 rounded-full font-bold text-xs uppercase tracking-wider transition-all duration-200 active:scale-95 ${
@@ -1205,311 +1056,15 @@ export default function Home() {
                   📖 Style Guide
                 </button>
               </div>
-
               {closetSubTab === 'items' && (
-                <div className="space-y-6">
-                  {/* Filters bar */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border border-[#EAE5D9] bg-white rounded-3xl shadow-sm">
-                    <div className="flex-1 min-w-[200px]">
-                      <input
-                        type="text"
-                        placeholder="Search items, brands, materials..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-[#F5F2EB] text-xs border border-[#EAE5D9] rounded-xl px-4 py-2 text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40"
-                      />
-                    </div>
-                    
-                    <div className="flex flex-wrap items-center gap-3">
-                      <select
-                        value={categoryFilter}
-                        onChange={(e) => {
-                          setCategoryFilter(e.target.value);
-                          setSubcategoryFilter('All');
-                        }}
-                        className="bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
-                      >
-                        <option value="All">All Categories</option>
-                        <option value="Tops">Tops</option>
-                        <option value="Bottoms">Bottoms</option>
-                        <option value="Outerwear">Outerwear</option>
-                        <option value="Footwear">Footwear</option>
-                        <option value="Tailoring">Tailoring</option>
-                        <option value="Shoe">Shoes</option>
-                        <option value="Bottom Shorts">Bottom Shorts</option>
-                        <option value="Top Long Sleeve">Top Long Sleeve</option>
-                        <option value="Top Outer Layer">Top Outer Layer</option>
-                      </select>
-
-                      {/* Color Filter */}
-                      <select
-                        value={colorFilter}
-                        onChange={(e) => setColorFilter(e.target.value)}
-                        className="bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
-                      >
-                        <option value="All">All Colors</option>
-                        {Array.from(new Set(items.map(i => i.color_family).filter(Boolean))).map(col => (
-                          <option key={col} value={col}>{col}</option>
-                        ))}
-                      </select>
-
-                      {/* Subcategory Filter */}
-                      <select
-                        value={subcategoryFilter}
-                        onChange={(e) => setSubcategoryFilter(e.target.value)}
-                        className="bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
-                      >
-                        <option value="All">All Subcategories</option>
-                        {Array.from(new Set(items
-                          .filter(i => categoryFilter === 'All' || i.category === categoryFilter)
-                          .map(i => i.sub_category)
-                          .filter(Boolean)
-                        )).map(sub => (
-                          <option key={sub} value={sub}>{sub}</option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
-                      >
-                        <option value="All">All Statuses</option>
-                        <option value="Active">Active Closet</option>
-                        <option value="Archive">Archive (Doesn't Fit)</option>
-                        <option value="Donate">Pending Donate</option>
-                        <option value="Processing">Processing...</option>
-                      </select>
-
-                      <div className="flex rounded-xl bg-[#F5F2EB] p-1 border border-[#EAE5D9]">
-                        <button
-                          onClick={() => setViewMode('grid')}
-                          className={`p-1.5 px-3 rounded-lg text-[10px] uppercase font-black transition ${viewMode === 'grid' ? 'bg-[var(--accent-terracotta)] text-white' : 'text-[var(--text-secondary)]'}`}
-                        >
-                          Grid
-                        </button>
-                        <button
-                          onClick={() => setViewMode('matrix')}
-                          className={`p-1.5 px-3 rounded-lg text-[10px] uppercase font-black transition ${viewMode === 'matrix' ? 'bg-[var(--accent-terracotta)] text-white' : 'text-[var(--text-secondary)]'}`}
-                        >
-                          Matrix
-                        </button>
-                      </div>
-
-                      {viewMode === 'grid' && (
-                        <div className="flex rounded-xl bg-[#F5F2EB] p-1 border border-[#EAE5D9]">
-                          {[1, 2, 3, 4].map((num) => (
-                            <button
-                              key={num}
-                              type="button"
-                              onClick={() => setGridColumns(num as 1 | 2 | 3 | 4)}
-                              className={`p-1.5 px-2.5 rounded-lg text-[10px] uppercase font-black transition ${gridColumns === num ? 'bg-[var(--accent-sage)] text-white' : 'text-[var(--text-secondary)]'}`}
-                            >
-                              {num} Col
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Grid View */}
-                  {loadingItems ? (
-                    <div className="text-center py-12"><p className="text-[var(--text-secondary)] text-xs">Loading items...</p></div>
-                  ) : filteredItems.length === 0 ? (
-                    <div className="text-center py-12 border border-[#EAE5D9] border-dashed rounded-2xl bg-white/40">
-                      <p className="text-[var(--text-secondary)] text-xs">No matching garments found in your closet.</p>
-                    </div>
-                  ) : viewMode === 'grid' ? (
-                    <div 
-                      className="grid gap-5"
-                      style={{
-                        gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`
-                      }}
-                    >
-                      {filteredItems.map((item) => (
-                        <div 
-                          key={item.id}
-                          onClick={() => setEditingItem(item)}
-                          className="group relative border border-[#EAE5D9] bg-white rounded-3xl overflow-hidden hover:border-[#DCD1C0] cursor-pointer flex flex-col transition-all duration-200 hover:-translate-y-0.5 tactile-shadow-sm"
-                        >
-                          <input 
-                            type="checkbox"
-                            checked={selectedItemIds.includes(item.id)}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleSelectItem(item.id);
-                            }}
-                            className="absolute top-3 right-3 z-10 w-4 h-4 rounded border-[#DCD1C0] text-[var(--accent-terracotta)] accent-[var(--accent-terracotta)] focus:ring-0 bg-white"
-                          />
-
-                          <div className="relative w-full aspect-square bg-[#FBFBFA] border-b border-[#EAE5D9] flex items-center justify-center p-2.5">
-                            {/* Color Dot Swatch Overlay */}
-                            <div 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingItem(item);
-                              }}
-                              className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-white/95 border border-[#EAE5D9] px-2 py-1 rounded-full shadow-xs cursor-pointer hover:bg-stone-50 active:scale-95 transition"
-                              title={`Color: ${item.color_family}. Click to customize.`}
-                            >
-                              <span 
-                                className="w-3.5 h-3.5 rounded-full border border-stone-300 shadow-inner shrink-0"
-                                style={{ backgroundColor: item.hex_code || '#cccccc' }}
-                              />
-                              <span className="text-[7.5px] font-black uppercase text-[var(--text-primary)] max-w-[54px] truncate">
-                                {item.color_family}
-                              </span>
-                            </div>
-
-                            {item.primary_image_url ? (
-                              <img src={item.primary_image_url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
-                            ) : (
-                              <div className="text-[10px] text-[var(--text-secondary)] font-bold">No Photo</div>
-                            )}
-                            
-                            {item.images && item.images.length > 1 && (
-                              <span className="absolute bottom-2.5 right-2.5 bg-white/90 border border-[#EAE5D9] px-2 py-0.5 rounded-full text-[8px] font-black text-[var(--accent-terracotta)] shadow-sm">
-                                📷 {item.images.length}
-                              </span>
-                            )}
-
-                            {item.status === 'Processing' && (
-                              <div className="absolute inset-0 bg-white/70 flex items-center justify-center backdrop-blur-xs">
-                                <div className="w-5 h-5 border-2 border-t-[var(--accent-terracotta)] border-[#EAE5D9] rounded-full animate-spin"></div>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="p-3.5 space-y-1">
-                            <div className="flex flex-col text-[8.5px] uppercase font-extrabold text-[var(--text-secondary)]">
-                              <div className="flex flex-wrap items-center gap-1">
-                                <span className="bg-[#FAF8F5] border border-[#EAE5D9] px-1.5 py-0.5 rounded text-[8px] font-black text-[var(--text-primary)]">
-                                  {item.sub_category}
-                                </span>
-                                {item.style_detail && (
-                                  <span className="bg-[#FAF8F5] border border-[#EAE5D9] px-1.5 py-0.5 rounded text-[7.5px] text-[var(--accent-terracotta)] font-extrabold lowercase">
-                                    {item.style_detail}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-center text-[8.5px] pt-1">
-                              <span className="text-[var(--text-secondary)] font-extrabold">{item.brand || 'Unbranded'}</span>
-                              {getItemWornCount(item.id, wearLogs) > 0 && (
-                                <span className="text-[var(--accent-sage)] font-black">Worn {getItemWornCount(item.id, wearLogs)}x</span>
-                              )}
-                            </div>
-                            <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{item.brand ? `${item.brand} ` : ''}{item.color_family}</h4>
-                            <div className="flex items-center justify-between text-[9px] text-[var(--text-secondary)] pt-2 border-t border-[#F5F2EA] mt-1.5">
-                              <span>CPW: <strong className="text-[var(--text-primary)] font-black">${getItemCostPerWear(item, getItemWornCount(item.id, wearLogs))}</strong></span>
-                              <button
-                                onClick={(e) => logGarmentWorn(item.id, e)}
-                                className="text-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]/85 font-black uppercase text-[8px] tracking-wider"
-                              >
-                                + Log Wear
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    /* Matrix View - Refactored as soft cards list to demolish strict table layout */
-                    <div className="space-y-3.5">
-                      {filteredItems.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => setEditingItem(item)}
-                          className="flex items-center justify-between gap-4 p-4 bg-white border border-[#EAE5D9] rounded-2xl cursor-pointer hover:border-[#DCD1C0] transition-all tactile-shadow-sm group"
-                        >
-                          <div className="flex items-center gap-4 min-w-0" onClick={(e) => e.stopPropagation()}>
-                            <input 
-                              type="checkbox"
-                              checked={selectedItemIds.includes(item.id)}
-                              onChange={() => handleSelectItem(item.id)}
-                              className="w-4 h-4 rounded border-[#DCD1C0] text-[var(--accent-terracotta)] accent-[var(--accent-terracotta)] focus:ring-0 bg-white"
-                            />
-                            <div className="w-12 h-12 rounded-xl border border-[#EAE5D9] overflow-hidden bg-[#FBFBFA] p-1 flex-shrink-0 flex items-center justify-center">
-                              {item.primary_image_url ? (
-                                <img src={item.primary_image_url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
-                              ) : (
-                                <span className="text-[8px] text-[var(--text-secondary)]">📷</span>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[8px] font-black uppercase text-[var(--text-secondary)] tracking-wider">{item.category}</span>
-                                <span 
-                                  className="w-2.5 h-2.5 rounded-full border border-stone-300 shadow-inner"
-                                  style={{ backgroundColor: item.hex_code || '#cccccc' }}
-                                  title={item.color_family}
-                                />
-                                <span className="text-[8px] font-bold text-[var(--text-secondary)]">{item.color_family}</span>
-                              </div>
-                              <h4 className="text-xs font-extrabold text-[var(--text-primary)] truncate mt-0.5">
-                                {item.brand ? `${item.brand} ` : ''}{item.sub_category}
-                              </h4>
-                              {/* Style specs into rounded textile tags */}
-                              <div className="flex items-center gap-1.5 mt-1">
-                                {item.style_detail && (
-                                  <span className="text-[8px] font-black uppercase bg-[var(--bg-card-secondary)] text-[var(--accent-terracotta)] px-2 py-0.5 rounded-full border border-[#EAE5D9]">
-                                    Style: {item.style_detail}
-                                  </span>
-                                )}
-                                <span className="text-[8px] font-black uppercase bg-[var(--bg-card-secondary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-full border border-[#EAE5D9]">
-                                  Fabric: {item.fabric_type || 'N/A'}
-                                </span>
-                                <span className="text-[8px] font-black uppercase bg-[var(--bg-card-secondary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-full border border-[#EAE5D9]">
-                                  Fit: {item.fit_block || 'N/A'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-6 shrink-0">
-                            <div className="text-right">
-                              <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase block">Price</span>
-                              <span className="text-xs font-bold text-[var(--text-primary)]">${item.price || '0'}</span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase block">Worn</span>
-                              <span className="text-xs font-bold text-[var(--accent-sage)]">{getItemWornCount(item.id, wearLogs)}x</span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase block">CPW</span>
-                              <span className="text-xs font-extrabold text-[var(--accent-terracotta)]">${getItemCostPerWear(item, getItemWornCount(item.id, wearLogs))}</span>
-                            </div>
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => logGarmentWorn(item.id)}
-                                className="px-3 py-1.5 rounded-full bg-[var(--accent-terracotta)] text-white hover:bg-[var(--accent-terracotta)]/90 text-[9px] font-extrabold transition shadow-sm"
-                              >
-                                + Wear
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Bulk bar */}
-                  {selectedItemIds.length > 0 && (
-                    <div className="fixed bottom-16 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3.5 bg-white border border-[#EAE5D9] shadow-2xl rounded-full px-5 py-3 text-xs font-bold text-[var(--text-primary)] animate-fade-in">
-                      <span>Selected <strong className="text-[var(--accent-terracotta)]">{selectedItemIds.length}</strong> items:</span>
-                      <div className="h-4 w-[1px] bg-[#EAE5D9]"></div>
-                      <button onClick={() => handleBulkChangeStatus('Active')} className="text-[var(--accent-sage)] font-extrabold hover:underline">Keep</button>
-                      <button onClick={() => handleBulkChangeStatus('Archive')} className="text-amber-600 font-extrabold hover:underline">Archive</button>
-                      <button onClick={() => handleBulkChangeStatus('Donate')} className="text-stone-500 font-extrabold hover:underline">Donate</button>
-                      <div className="h-4 w-[1px] bg-[#EAE5D9]"></div>
-                      <button onClick={handleBulkDelete} className="text-rose-600 font-extrabold hover:underline">Delete</button>
-                    </div>
-                  )}
-                </div>
+                <ClosetItemsTab
+                  items={items}
+                  wearLogs={wearLogs}
+                  onEdit={setEditingItem}
+                  notify={notify}
+                  confirmAction={confirmAction}
+                />
               )}
-
-              {/* SAVED OUTFITS SUB-TAB */}
               {closetSubTab === 'outfits' && (
                 <div className="space-y-6">
                   {loadingOutfits ? (
@@ -2936,7 +2491,6 @@ export default function Home() {
           <span>© 2026 Antigravity Threads</span>
           <span className="opacity-60">v2.31.0</span>
         </footer>
-      </main>
 
       {/* TELEMETRY DRAWER */}
       {showTelemetry && telemetry && (
