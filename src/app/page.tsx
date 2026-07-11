@@ -754,6 +754,9 @@ export default function Home() {
   return (
     <AuthGate>
       <div className="flex-1 flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] min-h-screen">
+        <main className={`flex-1 flex flex-col lg:flex-row w-full mx-auto p-4 sm:p-6 gap-6 mb-24 lg:mb-0 ${
+          activeTab === 'spreadsheet' ? 'max-w-[100%] lg:px-2' : 'max-w-7xl'
+        }`}>
         <aside className="hidden lg:block w-56 shrink-0 space-y-2">
           <button
             onClick={() => setActiveTab('closet')}
@@ -2506,6 +2509,7 @@ export default function Home() {
           )}
 
         </section>
+        </main>
 
         <footer className="mt-12 lg:mt-16 border-t border-[#EAE5D9] pt-4 pb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-[10px] text-[var(--text-secondary)] font-bold">
           <span>© 2026 Antigravity Threads</span>
