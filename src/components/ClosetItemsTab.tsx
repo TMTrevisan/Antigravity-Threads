@@ -192,6 +192,32 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
     }
   };
 
+  const handleBulkReprocess = async () => {
+    if (selectedItemIds.length === 0) return;
+    const ok = await confirmAction({
+      title: `Re-classify ${selectedItemIds.length} garments with AI?`,
+      description: `This will re-run Gemini on the primary photo of each selected item (1 API call per item). Use this when tags look wrong — it costs ~${selectedItemIds.length} tokens.`,
+      confirmLabel: `Re-classify ${selectedItemIds.length}`,
+    });
+    if (!ok) return;
+    try {
+      notify.info(`Re-classifying ${selectedItemIds.length} items…`);
+      const res = await fetch('/api/ingest/batch-process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedItemIds }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Re-classify failed.');
+      }
+      notify.success(`Done — ${selectedItemIds.length} items re-classified. Refresh to see new tags.`);
+      setSelectedItemIds([]);
+    } catch (err: any) {
+      notify.error(`Bulk re-classify failed: ${err.message}`);
+    }
+  };
+
   const handleExportCSV = () => {
     const csv = garmentsToCsv(items, (id) => getItemWornCount(id, wearLogs));
     downloadCsv(csv, 'threads_wardrobe_export.csv');
@@ -300,6 +326,13 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
               <option value="Donate">Donate</option>
               <option value="Discard">Discard</option>
             </select>
+            <button
+              type="button"
+              onClick={handleBulkReprocess}
+              className="text-[var(--accent-apricot)] font-extrabold hover:underline text-xs"
+            >
+              🔄 Re-classify
+            </button>
             <div className="h-4 w-[1px] bg-[var(--accent-terracotta)]/30"></div>
             <button onClick={handleBulkDelete} className="text-rose-600 font-extrabold hover:underline text-xs">
               Delete

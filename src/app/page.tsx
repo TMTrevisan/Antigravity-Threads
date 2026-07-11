@@ -11,6 +11,7 @@ import { INGEST_LIMITS } from '@/lib/constants';
 import { getItemWornCount, getItemCostPerWear, filterGarments } from '@/lib/garment-utils';
 import { compressImage, drawOutfitCollage } from '@/lib/image';
 import { garmentsToCsv, downloadCsv } from '@/lib/csv';
+import { filterValidOutfits, scoreOutfit } from '@/lib/styling-rules';
 
 export default function Home() {
   const notify = useToasts();
@@ -701,6 +702,7 @@ export default function Home() {
 
   const handleGenerateStylist = async (e?: React.FormEvent | null) => {
     e?.preventDefault?.();
+    console.log('[GenerateStylist] start', { items: items.length, weather: weatherInput, event: eventInput });
     setIsGenerating(true);
     setStylingError('');
     setStylistResult(null);
@@ -718,13 +720,31 @@ export default function Home() {
         }),
       });
 
+      console.log('[GenerateStylist] response', res.status, res.statusText);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Stylist processing failed.');
 
-      setStylistResult((data.data ?? data).recommendations);
+      const recs = (data.data ?? data).recommendations;
+      console.log('[GenerateStylist] got', recs?.outfits?.length, 'outfits');
+
+      // Drop outfits whose UUIDs Gemini hallucinated.
+      const before = recs?.outfits?.length ?? 0;
+      const valid = filterValidOutfits(recs?.outfits ?? [], items);
+      if (before !== valid.length) {
+        console.warn(`[GenerateStylist] dropped ${before - valid.length} outfits with invalid UUIDs`);
+      }
+
+      // Score + sort by total (descending) so the best outfits appear first.
+      const eventCtx = { event: eventInput, weather: weatherInput };
+      const ranked = [...valid]
+        .map((o: any) => ({ ...o, _score: scoreOutfit(o.item_ids, items, eventCtx).total }))
+        .sort((a, b) => (b._score ?? 0) - (a._score ?? 0))
+        .map(({ _score, ...rest }: any) => rest);
+
+      setStylistResult({ ...recs, outfits: ranked });
       fetchTelemetry();
     } catch (err: any) {
-      console.error(err);
+      console.error('[GenerateStylist] error', err);
       setStylingError(err.message || 'Error occurred.');
     } finally {
       setIsGenerating(false);
@@ -2893,7 +2913,34 @@ export default function Home() {
           >
             <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3">
               <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Edit Garment Curation</h3>
-              <button onClick={() => setEditingItem(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold">✕</button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!editingItem) return;
+                    console.log('[Reprocess] start', editingItem.id);
+                    notify.info('Re-classifying with AI…');
+                    try {
+                      const res = await fetch('/api/ingest/batch-process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids: [editingItem.id] }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || 'Re-process failed.');
+                      await fetchItems();
+                      notify.success('Re-classification complete. Refresh to see updated tags.');
+                    } catch (err: any) {
+                      console.error('[Reprocess] error', err);
+                      notify.error(`Re-process failed: ${err.message}`);
+                    }
+                  }}
+                  className="text-[10px] font-extrabold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-[var(--accent-apricot)] text-[var(--text-primary)] hover:bg-[var(--accent-apricot)]/80 transition active:scale-95"
+                >
+                  🔄 Re-classify with AI
+                </button>
+                <button onClick={() => setEditingItem(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold">✕</button>
+              </div>
             </div>
 
             <form onSubmit={async (e) => {
@@ -3214,6 +3261,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={async () => {
+                          console.log('[BuildOutfit] click', { itemId: editingItem.id });
                           // Prefill stylist input with garment details, switch tab,
                           // and immediately run the generation so the user gets
                           // 4–6 outfit options without a second click.
@@ -3222,8 +3270,12 @@ export default function Home() {
                           setEventInput(prompt);
                           setEditingItem(null);
                           setActiveTab('stylist');
+                          console.log('[BuildOutfit] tab switched, scheduling generation in 50ms');
                           // Wait a tick so the stylist tab mounts before we fire.
-                          setTimeout(() => handleGenerateStylist(null), 50);
+                          setTimeout(() => {
+                            console.log('[BuildOutfit] firing handleGenerateStylist');
+                            handleGenerateStylist(null);
+                          }, 50);
                         }}
                         className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/20 hover:bg-[var(--accent-terracotta)]/20 font-black text-[10px] uppercase tracking-wider transition active:scale-95"
                       >
