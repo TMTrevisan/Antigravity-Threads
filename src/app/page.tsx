@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import AuthGate from '@/components/AuthGate';
 import { useToasts, useConfirmAction } from '@/components/Toaster';
 import ChatPanel from '@/components/ChatPanel';
@@ -8,6 +8,7 @@ import SnapTab from '@/components/SnapTab';
 import ClosetItemsTab from '@/components/ClosetItemsTab';
 import EditModal from '@/components/EditModal';
 import Sidebar from '@/components/Sidebar';
+import CommandPalette, { useCommandPaletteShortcut, type PaletteAction } from '@/components/CommandPalette';
 import type { Garment, WearLog, SavedOutfit, StylistOutput, TelemetryStats, IngestGroup } from '@/types/db';
 import { INGEST_LIMITS } from '@/lib/constants';
 import { getItemWornCount, getItemCostPerWear, filterGarments } from '@/lib/garment-utils';
@@ -70,6 +71,33 @@ export default function Home() {
   }, [editingItem, validationTarget]);
 
   const [chatOpen, setChatOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useCommandPaletteShortcut(setPaletteOpen);
+
+  // Build the palette action list. Memoized so it doesn't rebuild on
+  // every render. Adds navigation, recent garments, and common actions.
+  const paletteActions: PaletteAction[] = useMemo(() => {
+    const nav: PaletteAction[] = [
+      { id: 'go-snap', label: 'Go to Snap', group: 'Navigate', shortcut: '1', run: () => setActiveTab('snap') },
+      { id: 'go-closet', label: 'Go to My Closet', group: 'Navigate', shortcut: '2', run: () => setActiveTab('closet') },
+      { id: 'go-spreadsheet', label: 'Go to Spreadsheet', group: 'Navigate', shortcut: '3', run: () => setActiveTab('spreadsheet') },
+      { id: 'go-stylist', label: 'Go to AI Stylist', group: 'Navigate', shortcut: '4', run: () => setActiveTab('stylist') },
+      { id: 'go-metrics', label: 'Go to Metrics', group: 'Navigate', shortcut: '5', run: () => setActiveTab('metrics') },
+    ];
+    const acts: PaletteAction[] = [
+      { id: 'act-export', label: 'Export closet as CSV', hint: 'Download all items + wear counts', group: 'Actions', run: () => { setActiveTab('closet'); handleExportCSV(); } },
+      { id: 'act-generate', label: 'Generate stylist outfits', hint: 'Ask AI for 4–6 outfit options', group: 'Actions', run: () => { setActiveTab('stylist'); setTimeout(() => handleGenerateStylist(null), 100); } },
+    ];
+    const garments: PaletteAction[] = items.slice(0, 50).map((g) => ({
+      id: `g-${g.id}`,
+      label: `${g.brand || 'No brand'} · ${g.sub_category}`,
+      hint: `${g.color_family}${g.fabric_type ? ` · ${g.fabric_type}` : ''} · ${g.status}`,
+      group: 'Garments' as const,
+      run: () => setEditingItem(g),
+    }));
+    return [...nav, ...acts, ...garments];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, paletteOpen]);
 
   // Re-classify handler passed into <EditModal>. Hits the same batch-process
   // endpoint the bulk re-classify uses; single-item scope.
@@ -3015,12 +3043,31 @@ export default function Home() {
         <span className="text-xl">💬</span>
       </button>
 
+      {/* CMD+K PALETTE TRIGGER (bottom-left) */}
+      <button
+        onClick={() => setPaletteOpen(true)}
+        className="fixed bottom-20 left-4 lg:bottom-6 lg:left-6 z-40 px-3 py-2 rounded-full bg-white border border-[#EAE5D9] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-terracotta)]/40 shadow-md flex items-center gap-2 text-[10px] font-extrabold tracking-wider transition"
+        title="Open command palette (Cmd+K)"
+        aria-label="Open command palette"
+      >
+        <span aria-hidden="true">🔎</span>
+        <span>SEARCH</span>
+        <kbd className="text-[9px] bg-stone-100 border border-stone-200 px-1 py-0.5 rounded font-mono">⌘K</kbd>
+      </button>
+
       {/* CHAT DRAWER PANEL */}
       <ChatPanel
         open={chatOpen}
         onClose={() => setChatOpen(false)}
         items={items}
         wearLogs={wearLogs}
+      />
+
+      {/* CMD+K COMMAND PALETTE */}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        actions={paletteActions}
       />
       </div>
     </AuthGate>
