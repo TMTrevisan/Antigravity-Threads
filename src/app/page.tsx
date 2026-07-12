@@ -6,6 +6,7 @@ import { useToasts, useConfirmAction } from '@/components/Toaster';
 import ChatPanel from '@/components/ChatPanel';
 import SnapTab from '@/components/SnapTab';
 import ClosetItemsTab from '@/components/ClosetItemsTab';
+import EditModal from '@/components/EditModal';
 import type { Garment, WearLog, SavedOutfit, StylistOutput, TelemetryStats, IngestGroup } from '@/types/db';
 import { INGEST_LIMITS } from '@/lib/constants';
 import { getItemWornCount, getItemCostPerWear, filterGarments } from '@/lib/garment-utils';
@@ -68,6 +69,38 @@ export default function Home() {
   }, [editingItem, validationTarget]);
 
   const [chatOpen, setChatOpen] = useState(false);
+
+  // Re-classify handler passed into <EditModal>. Hits the same batch-process
+  // endpoint the bulk re-classify uses; single-item scope.
+  const handleReclassifyEditModal = async (id: string) => {
+    console.log('[EditModal][Reclassify] start', id);
+    notify.info('Re-classifying with AI…');
+    try {
+      const res = await fetch('/api/ingest/batch-process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Re-classify failed.');
+      }
+      notify.success('Re-classification complete. Refresh to see updated tags.');
+    } catch (err: any) {
+      notify.error(`Re-process failed: ${err.message}`);
+    }
+  };
+
+  // "Build Outfit Around Item" — pre-fills stylist inputs, switches tab,
+  // and auto-fires the stylist generation so the user gets outfits in one click.
+  const handleBuildOutfitAround = (g: Garment) => {
+    const prompt = `Built around: ${g.brand || ''} ${g.color_family} ${g.sub_category}`.trim();
+    setLookbookInput(prompt);
+    setEventInput(prompt);
+    setEditingItem(null);
+    setActiveTab('stylist');
+    setTimeout(() => handleGenerateStylist(null), 50);
+  };
 
   const uploadImageToGarment = async (file: File) => {
     if (!editingItem) return;
@@ -2916,510 +2949,32 @@ export default function Home() {
         </div>
       )}
 
-      {/* EDITING DIALOG MODAL */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div 
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={async (e) => {
-              e.preventDefault();
-              const file = e.dataTransfer.files?.[0];
-              if (file && file.type.startsWith('image/')) {
-                await uploadImageToGarment(file);
-              }
-            }}
-            className="bg-white border border-[#EAE5D9] rounded-3xl p-6 w-full max-w-4xl space-y-4 max-h-[90vh] overflow-y-auto relative text-[var(--text-primary)] shadow-2xl shadow-stone-300"
-          >
-            <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3">
-              <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Edit Garment Curation</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!editingItem) return;
-                    console.log('[Reprocess] start', editingItem.id);
-                    notify.info('Re-classifying with AI…');
-                    try {
-                      const res = await fetch('/api/ingest/batch-process', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ids: [editingItem.id] }),
-                      });
-                      const data = await res.json();
-                      if (!res.ok) throw new Error(data.error || 'Re-process failed.');
-                      await fetchItems();
-                      notify.success('Re-classification complete. Refresh to see updated tags.');
-                    } catch (err: any) {
-                      console.error('[Reprocess] error', err);
-                      notify.error(`Re-process failed: ${err.message}`);
-                    }
-                  }}
-                  className="text-xs font-extrabold uppercase tracking-wider px-4 py-2 rounded-xl bg-[var(--accent-apricot)] text-[var(--text-primary)] hover:bg-[var(--accent-apricot)]/80 transition active:scale-95 shadow-sm border border-[var(--accent-apricot)]/40"
-                  title="Re-run Gemini on all images (uses 1 token)"
-                >
-                  🔄 Re-classify with AI
-                </button>
-                <button onClick={() => setEditingItem(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold">✕</button>
-              </div>
-            </div>
-
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              setIsSavingEdit(true);
-              try {
-                const res = await fetch('/api/items', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(editingItem),
-                });
-                if (res.ok) {
-                  const data = await res.json();
-                  const payload = data.data ?? data;
-                  setItems(prev => prev.map(i => i.id === payload.item.id ? payload.item : i));
-                  setEditingItem(null);
-                }
-              } catch (err) {
-                console.error(err);
-              } finally {
-                setIsSavingEdit(false);
-              }
-            }} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Left Column: Image Management */}
-              <div className="space-y-4">
-                <div className="relative w-full aspect-square max-w-[280px] mx-auto rounded-2xl overflow-hidden border border-[#EAE5D9] bg-[#FBFBFA] flex flex-col items-center justify-center p-1.5 shadow-inner">
-                  {editingItem.primary_image_url && (
-                    <img 
-                      src={editingItem.primary_image_url} 
-                      alt="" 
-                      className="object-contain w-full h-full mix-blend-multiply transition-transform duration-200" 
-                      style={{ transform: `rotate(${(editingItem as any).rotation || 0}deg)` }}
-                    />
-                  )}
-                </div>
-                <div className="flex justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const currentRotation = (editingItem as any).rotation || 0;
-                      const nextRotation = (currentRotation + 90) % 360;
-                      setEditingItem({
-                        ...editingItem,
-                        rotation: nextRotation
-                      } as any);
-                    }}
-                    className="px-3 py-1.5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl text-[10px] font-black uppercase text-[var(--accent-terracotta)] hover:bg-[#F5F2EB] active:scale-95 transition"
-                  >
-                    🔄 Rotate Photo (90°)
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={searchQueryText}
-                      onChange={(e) => setSearchQueryText(e.target.value)}
-                      placeholder="Search query (e.g. White Oxford Shirt)..."
-                      className="flex-1 bg-[#F5F2EB] border border-[#EAE5D9] rounded-xl px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-stone-400 focus:outline-none focus:border-[var(--accent-terracotta)]/40"
-                    />
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setIsSearchingImage(true);
-                        setSearchResults(null);
-                          try {
-                            const res = await fetch('/api/items/search-image', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                brand: editingItem.brand || '',
-                                description: searchQueryText
-                              })
-                            });
-                            const data = await res.json();
-                            if (res.ok) {
-                              setSearchResults((data.data ?? data).images || []);
-                            } else {
-                              notify.error(`Search failed: ${data.error || 'Unknown error'}`);
-                            }
-                          } catch (err: any) {
-                            notify.error(`Search error: ${err.message}`);
-                          } finally {
-                            setIsSearchingImage(false);
-                          }
-                        }}
-                        disabled={isSearchingImage}
-                        className="px-3 py-1.5 bg-[#FAF8F5] border border-[#EAE5D9] text-[var(--accent-terracotta)] rounded-xl text-xs font-black transition hover:bg-[#F5F2EB] active:scale-95 shrink-0"
-                      >
-                        {isSearchingImage ? 'Searching...' : '🔍 Find Photo'}
-                      </button>
-                  </div>
-
-                  {searchResults && (
-                    <div className="border border-[#EAE5D9] bg-[#FAF8F5] rounded-2xl p-3.5 space-y-2.5">
-                      <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] font-extrabold uppercase">
-                        <span>Add Alternate/Gallery Photo</span>
-                        <button type="button" onClick={() => setSearchResults(null)} className="text-[var(--accent-terracotta)]">Close</button>
-                      </div>
-                      <div className="grid grid-cols-4 gap-2">
-                        {searchResults.slice(0, 4).map((img: any, idx: number) => (
-                          <div
-                            key={idx}
-                            onClick={async () => {
-                              if (isReplacingImage) return;
-                              setIsReplacingImage(true);
-                              try {
-                                const res = await fetch('/api/items/search-image', {
-                                  method: 'PUT',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    garmentId: editingItem.id,
-                                    imageUrl: img.url
-                                  }),
-                                });
-                                const data = await res.json();
-                                if (res.ok) {
-                                  setEditingItem({
-                                    ...editingItem,
-                                    images: data.images
-                                  });
-                                  await fetchItems();
-                                  setSearchResults(null);
-                                } else {
-                                  notify.error(`Failed to add photo: ${data.error || 'Unknown error'}`);
-                                }
-                              } catch (err: any) {
-                                notify.error(`Error replacing photo: ${err.message}`);
-                              } finally {
-                                setIsReplacingImage(false);
-                              }
-                            }}
-                            className="relative aspect-square border border-[#EAE5D9] rounded-xl overflow-hidden bg-white cursor-pointer hover:border-[var(--accent-terracotta)] transition group"
-                          >
-                            <img src={img.url} alt="" className="object-contain w-full h-full mix-blend-multiply" />
-                            <div className="absolute inset-x-0 bottom-0 bg-white/80 text-[7px] text-[var(--text-secondary)] px-1 py-0.5 truncate text-center group-hover:text-[var(--accent-terracotta)] font-bold">
-                              {img.source}
-                            </div>
-                            {isReplacingImage && (
-                              <div className="absolute inset-0 bg-white/60 flex items-center justify-center text-[8px] text-[var(--accent-terracotta)] animate-pulse font-bold">
-                                Adding...
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Thumbnails list in editor */}
-                <div className="relative flex justify-center gap-1.5 overflow-x-auto py-1">
-                  {isUploadingImage && (
-                    <div className="absolute inset-0 bg-white/60 z-30 flex items-center justify-center rounded-2xl">
-                      <div className="w-4 h-4 rounded-full border border-[var(--accent-terracotta)] border-t-transparent animate-spin"></div>
-                    </div>
-                  )}
-                  {editingItem.images.map((img: any) => (
-                    <div 
-                      key={img.id} 
-                      onClick={() => setPrimaryImage(img.id)}
-                      className={`relative w-9 h-9 border rounded-xl overflow-hidden bg-white shrink-0 cursor-pointer group transition ${
-                        img.is_primary_profile ? 'border-[var(--accent-terracotta)] ring-1 ring-[var(--accent-terracotta)]' : 'border-[#EAE5D9] hover:border-[#DCD1C0]'
-                      }`}
-                    >
-                      <img src={img.storage_path} alt="" className="object-contain w-full h-full mix-blend-multiply" />
-                      {!img.is_primary_profile && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteGarmentImage(img.id);
-                          }}
-                          className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-[var(--accent-terracotta)] hover:bg-[var(--accent-terracotta)]/85 rounded-full flex items-center justify-center text-[7px] text-white font-extrabold opacity-0 group-hover:opacity-100 transition"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Right Column: Metadata Fields Form */}
-              <div className="space-y-4 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Category</label>
-                      <select
-                        value={editingItem.category}
-                        onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      >
-                        <option value="Tops">Tops</option>
-                        <option value="Bottoms">Bottoms</option>
-                        <option value="Outerwear">Outerwear</option>
-                        <option value="Footwear">Footwear</option>
-                        <option value="Tailoring">Tailoring</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Status</label>
-                      <select
-                        value={editingItem.status}
-                        onChange={(e) => setEditingItem({ ...editingItem, status: e.target.value as any })}
-                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      >
-                        <option value="Active">Active Closet</option>
-                        <option value="Archive">Archive (Doesn't Fit)</option>
-                        <option value="Donate">Pending Donate</option>
-                        <option value="Discard">Discard / Sell</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Sub-Category</label>
-                      <input
-                        type="text"
-                        value={editingItem.sub_category}
-                        onChange={(e) => setEditingItem({ ...editingItem, sub_category: e.target.value })}
-                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Brand</label>
-                      <input
-                        type="text"
-                        value={editingItem.brand || ''}
-                        onChange={(e) => setEditingItem({ ...editingItem, brand: e.target.value || null })}
-                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Purchase Price ($)</label>
-                      <input
-                        type="number"
-                        value={editingItem.price || 0}
-                        onChange={(e) => setEditingItem({ ...editingItem, price: Number(e.target.value) })}
-                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Purchase Year</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 2026"
-                        value={editingItem.purchase_year || ''}
-                        onChange={(e) => setEditingItem({ ...editingItem, purchase_year: e.target.value ? Number(e.target.value) : null })}
-                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Fabric</label>
-                      <input
-                        type="text"
-                        value={editingItem.fabric_type || ''}
-                        onChange={(e) => setEditingItem({ ...editingItem, fabric_type: e.target.value || null })}
-                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Fit Block</label>
-                      <input
-                        type="text"
-                        value={editingItem.fit_block || ''}
-                        onChange={(e) => setEditingItem({ ...editingItem, fit_block: e.target.value || null })}
-                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Color Family</label>
-                      <input
-                        type="text"
-                        value={editingItem.color_family}
-                        onChange={(e) => setEditingItem({ ...editingItem, color_family: e.target.value })}
-                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Sleeve / Detail</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Long Sleeve, Short Sleeve"
-                        value={editingItem.style_detail || ''}
-                        onChange={(e) => setEditingItem({ ...editingItem, style_detail: e.target.value || null })}
-                        className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Notes Field */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">📝 Notes</label>
-                    <textarea
-                      value={editingItem.notes || ''}
-                      onChange={(e) => setEditingItem({ ...editingItem, notes: e.target.value || null })}
-                      placeholder="Add personal notes, care instructions, styling ideas..."
-                      rows={3}
-                      className="w-full bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2.5 text-xs text-[var(--text-primary)] resize-none focus:outline-none focus:border-[var(--accent-terracotta)]/40"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Curation Actions + Wear History */}
-                  <div className="space-y-2 border-t border-[#EAE5D9] pt-2.5">
-                    <div className="flex gap-2 items-center justify-between text-xs text-[var(--text-secondary)]">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          console.log('[BuildOutfit] click', { itemId: editingItem.id });
-                          // Prefill stylist input with garment details, switch tab,
-                          // and immediately run the generation so the user gets
-                          // 4–6 outfit options without a second click.
-                          const prompt = `Built around: ${editingItem.brand || ''} ${editingItem.color_family} ${editingItem.sub_category}`.trim();
-                          setLookbookInput(prompt);
-                          setEventInput(prompt);
-                          setEditingItem(null);
-                          setActiveTab('stylist');
-                          console.log('[BuildOutfit] tab switched, scheduling generation in 50ms');
-                          // Wait a tick so the stylist tab mounts before we fire.
-                          setTimeout(() => {
-                            console.log('[BuildOutfit] firing handleGenerateStylist');
-                            handleGenerateStylist(null);
-                          }, 50);
-                        }}
-                        className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)] border border-[var(--accent-terracotta)]/20 hover:bg-[var(--accent-terracotta)]/20 font-black text-[10px] uppercase tracking-wider transition active:scale-95"
-                      >
-                        ⚡ Build Outfit Around Item
-                      </button>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[var(--text-primary)] font-extrabold">{getItemWornCount(editingItem.id, wearLogs)}x total</span>
-                        <button
-                          type="button"
-                          onClick={() => logGarmentWorn(editingItem.id)}
-                          className="px-3 py-1 rounded-lg bg-[var(--accent-terracotta)] text-white font-extrabold text-xs"
-                        >
-                          + Log Wear
-                        </button>
-                      </div>
-                    </div>
-                    {/* Collapsible scrollable history */}
-                    {wearLogs.filter(l => l.garment_id === editingItem.id).length > 0 && (
-                      <details className="group">
-                        <summary className="text-[10px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)] transition select-none list-none flex items-center gap-1 font-bold">
-                          <span className="group-open:hidden">▶</span>
-                          <span className="hidden group-open:inline">▼</span>
-                          {wearLogs.filter(l => l.garment_id === editingItem.id).length} wear entries
-                        </summary>
-                        <div className="mt-1.5 max-h-32 overflow-y-auto space-y-0.5 bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2.5">
-                          {wearLogs
-                            .filter(l => l.garment_id === editingItem.id)
-                            .sort((a, b) => new Date(b.worn_at).getTime() - new Date(a.worn_at).getTime())
-                            .map((log, idx) => (
-                              <div key={log.id} className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] py-0.5 border-b border-[#FAF8F5] last:border-0 font-semibold">
-                                <span>#{wearLogs.filter(l => l.garment_id === editingItem.id).length - idx}</span>
-                                <span>{new Date(log.worn_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                              </div>
-                            ))}
-                        </div>
-                      </details>
-                    )}
-                  </div>
-
-                  {/* Merge Garments Section */}
-                  <div className="space-y-2 border-t border-[#EAE5D9] pt-2.5">
-                    <span className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Merge with Another Garment</span>
-                    <div className="flex gap-2">
-                      <select
-                        value={mergeTargetGarmentId}
-                        onChange={(e) => setMergeTargetGarmentId(e.target.value)}
-                        className="flex-1 bg-[#FAF8F5] border border-[#EAE5D9] rounded-xl p-2 text-xs text-[var(--text-primary)] focus:outline-none"
-                      >
-                        <option value="">-- Choose garment to merge into --</option>
-                        {items
-                          .filter(i => i.id !== editingItem.id)
-                          .sort((a, b) => (a.brand || '').localeCompare(b.brand || ''))
-                          .map(i => (
-                            <option key={i.id} value={i.id}>
-                              [{i.category}] {i.brand || 'Generic'} - {i.sub_category} ({i.color_family})
-                            </option>
-                          ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={handleMergeGarments}
-                        disabled={!mergeTargetGarmentId || isMergingGarments}
-                        className="px-3.5 py-2 bg-[var(--accent-sage)] text-white hover:bg-[var(--accent-sage)]/90 disabled:bg-stone-100 disabled:text-stone-400 font-extrabold text-[10px] uppercase tracking-wider rounded-xl transition active:scale-95 shrink-0"
-                      >
-                        {isMergingGarments ? 'Merging...' : 'Merge ⎘'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-span-1 md:col-span-2 flex justify-between pt-3 border-t border-[#EAE5D9] mt-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!confirm('Confirm deletion?')) return;
-                    try {
-                      const res = await fetch(`/api/items?id=${editingItem.id}`, { method: 'DELETE' });
-                      if (res.ok) {
-                        setItems(prev => prev.filter(i => i.id !== editingItem.id));
-                        setEditingItem(null);
-                      }
-                    } catch (err) {
-                      console.error(err);
-                    }
-                  }}
-                  className="px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-xl text-xs font-bold transition"
-                >
-                  Delete
-                </button>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const primaryImg = editingItem.images?.find((img: any) => img.is_primary_profile) || editingItem.images?.[0] || { storage_path: editingItem.primary_image_url };
-                      if (!primaryImg || !primaryImg.storage_path) {
-                        notify.error('No image found for this garment.');
-                        return;
-                      }
-                      setEditingItem(null);
-                      await runClientSideCutout(editingItem.id, primaryImg.storage_path);
-                    }}
-                    className="px-4 py-2 bg-[#FAF8F5] text-[var(--accent-terracotta)] border border-[#EAE5D9] hover:bg-[#F5F2EB] rounded-xl text-xs font-bold transition flex items-center gap-1"
-                  >
-                    ✨ Run AI Cutout
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingItem(null)}
-                    className="px-4 py-2 bg-[#F5F2EB] text-stone-600 hover:bg-stone-200 rounded-xl text-xs font-bold border border-[#EAE5D9]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-[var(--accent-terracotta)] text-white hover:bg-[var(--accent-terracotta)]/95 rounded-xl text-xs font-bold shadow-md"
-                  >
-                    {isSavingEdit ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
+        <EditModal
+          garment={editingItem}
+          wearLogs={wearLogs}
+          searchQueryText={searchQueryText}
+          setSearchQueryText={setSearchQueryText}
+          searchResults={searchResults}
+          setSearchResults={setSearchResults}
+          isSearchingImage={isSearchingImage}
+          setIsSearchingImage={setIsSearchingImage}
+          isReplacingImage={isReplacingImage}
+          setIsReplacingImage={setIsReplacingImage}
+          onClose={() => setEditingItem(null)}
+          onSaved={(g) => {
+            setEditingItem(g);
+            setItems(prev => prev.map(i => i.id === g.id ? g : i));
+          }}
+          notify={notify}
+          confirmAction={confirmAction}
+          onReclassify={handleReclassifyEditModal}
+          onBuildOutfitAround={handleBuildOutfitAround}
+          onMergeGarment={(sourceId, targetId) => {
+            setEditingItem(null);
+            fetchItems();
+          }}
+        />
       )}
 
       {/* MOBILE BOTTOM NAVIGATION BAR */}
