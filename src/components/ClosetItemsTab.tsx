@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect } from 'react';
 import type { Garment, WearLog } from '@/types/db';
 import { getItemWornCount, getItemCostPerWear } from '@/lib/garment-utils';
 import { garmentsToCsv, downloadCsv } from '@/lib/csv';
+import EmptyState from './EmptyState';
+import LoadingSkeleton from './LoadingSkeleton';
 
 interface ClosetItemsTabProps {
   items: Garment[];
@@ -472,10 +474,11 @@ export default function ClosetItemsTab({ items, wearLogs, onEdit, notify, confir
           </details>
 
           {filteredItems.length === 0 ? (
-            <div className="text-center py-12 text-[var(--text-secondary)]">
-              <span className="text-3xl">🪡</span>
-              <p className="mt-2 text-xs font-bold">No garments match your filters yet.</p>
-            </div>
+            <EmptyState
+              icon="🪡"
+              title="No garments match your filters yet"
+              description="Try clearing a filter or upload new photos from the Snap tab."
+            />
           ) : (
             <>
               <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] font-bold px-2">
