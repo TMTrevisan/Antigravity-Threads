@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-lite-latest',
+      model: 'gemini-3.1-flash-lite',
       contents: promptText,
       config: {
         responseMimeType: 'application/json',

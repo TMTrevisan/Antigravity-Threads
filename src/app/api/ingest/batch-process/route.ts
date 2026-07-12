@@ -96,7 +96,7 @@ export const POST = withUser(async ({ user, request }) => {
       const response = await withRetry(
         () =>
           ai!.models.generateContent({
-            model: 'gemini-flash-lite-latest',
+            model: 'gemini-3.1-flash-lite',
             contents: [...imageParts, { text: promptText }],
             config: {
               responseMimeType: 'application/json',

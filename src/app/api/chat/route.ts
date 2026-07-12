@@ -37,7 +37,7 @@ Rules & Instructions:
       }
 
       // We call the Gemini API using native fetch to handle custom user keys dynamically
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${key}`;
       
       const contents = messages.map((m: any) => ({
         role: m.role === 'assistant' ? 'model' : 'user',

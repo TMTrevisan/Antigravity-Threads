@@ -7,7 +7,7 @@ Antigravity Threads is a premium, data-driven, autonomous personal wardrobe coor
 ## 🚀 Key Features
 
 * **Asynchronous Multi-Image Ingestion (1:Many)**: Groups multiple files (e.g., wide profile shots, close-up laundry brand/size tags, and material textures) under a single garment record.
-* **Gemini Multimodal Synthesis**: Sends grouped image streams concurrently in a single multimodal request to `gemini-2.5-flash` to extract category, color, brand, sizing, and fabric metrics with zero extra token costs.
+* **Gemini Multimodal Synthesis**: Sends grouped image streams concurrently in a single multimodal request to `gemini-3.1-flash-lite` to extract category, color, brand, sizing, and fabric metrics with zero extra token costs.
 * **Cost-Per-Wear (CPW) Tracker**: Input garment purchase prices and log wears in one click. Displays live cost-per-wear ratios (`CPW = Price / Wears`) across visual grids and spreadsheets.
 * **System Telemetry & Billing Ledger**: Audit API costs, input/output token usage, and request latencies per service from a beautiful collapsible telemetry panel.
 * **Saved Outfits**: Save outfit layouts and styling advice recommended by the AI Stylist to your saved outfits archive.
