@@ -6,6 +6,11 @@ export type TokenService = 'Gemini_Vision_Ingest' | 'Gemini_Stylist_Engine' | 'P
  * Logs token usage and estimated API cost to the billing_and_token_ledger
  * table. Pass the authenticated user's JWT-scoped client when available
  * so the row carries `user_id` and the per-user telemetry dashboard works.
+ *
+ * Pricing rates reflect Gemini 3.1 Flash Lite (paid tier):
+ *   Input:  $0.125 / 1M tokens  (free tier: $0 — opt-in training)
+ *   Output: $0.75  / 1M tokens  (free tier: $0 — opt-in training)
+ * Switch to `GEMINI_TIER=free` env var if you've opted into the free tier.
  */
 export async function logTelemetry(
   service: TokenService,
@@ -20,9 +25,11 @@ export async function logTelemetry(
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     );
 
-    // Pricing rates per 1,000,000 tokens (Gemini 2.5 Flash / 1.5 Flash reference rates)
-    let costPerTokenIn = 0.000000075; // $0.075 / 1M
-    let costPerTokenOut = 0.0000003;  // $0.30 / 1M
+    // Gemini 3.1 Flash Lite pricing (per 1M tokens). Use the free tier
+    // if the operator opts in via env var.
+    const useFree = process.env.GEMINI_TIER === 'free';
+    let costPerTokenIn = useFree ? 0 : 0.000000125;   // $0.125 / 1M
+    let costPerTokenOut = useFree ? 0 : 0.00000075;   // $0.75  / 1M
 
     if (service === 'Pirate_Weather_API') {
       costPerTokenIn = 0.0001; // Weather flat lookup cost mock
