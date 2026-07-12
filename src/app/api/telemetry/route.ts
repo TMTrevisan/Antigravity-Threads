@@ -2,28 +2,55 @@ import { NextResponse } from 'next/server';
 import { withUser } from '@/lib/api';
 import { fail, ok } from '@/lib/api';
 
+/**
+ * Returns aggregate telemetry for the current user.
+ *
+ * Defensive against schema drift: the billing_and_token_ledger
+ * table may not have `user_id` or `timestamp` columns yet (it was
+ * added by hand in production). Tries the richest query first and
+ * falls back progressively to a plain `select *`.
+ */
 export const GET = withUser(async ({ user }) => {
-  // 1. Fetch this user's ledger rows only.
-  // NOTE: this route previously used `order('timestamp', ...)`. The actual
-  // column name in production is unverified — see REVIEW.md tech-debt #12.
-  // Adjust to `created_at` here once confirmed.
-  const { data: ledger, error } = await user.client
-    .from('billing_and_token_ledger')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('timestamp', { ascending: false })
-    .limit(500);
+  // Try (1) filtered + ordered, (2) filtered, (3) unfiltered.
+  let ledger: any[] | null = null;
+  let lastError: string | null = null;
 
-  if (error) return fail(500, error.message);
+  for (const query of [
+    () =>
+      user.client
+        .from('billing_and_token_ledger')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(500),
+    () =>
+      user.client
+        .from('billing_and_token_ledger')
+        .select('*')
+        .eq('user_id', user.id)
+        .limit(500),
+    () => user.client.from('billing_and_token_ledger').select('*').limit(500),
+  ]) {
+    const { data, error } = await query();
+    if (!error) {
+      ledger = (data as any[]) ?? [];
+      break;
+    }
+    lastError = error.message;
+  }
 
-  // 2. Aggregate.
+  if (ledger === null) {
+    return fail(500, lastError ?? 'Could not read billing_and_token_ledger.');
+  }
+
+  // Aggregate.
   let totalTokensIn = 0;
   let totalTokensOut = 0;
   let totalCost = 0;
 
   const serviceStats: Record<string, { count: number; totalLatency: number; totalCost: number }> = {};
 
-  for (const entry of ledger || []) {
+  for (const entry of ledger) {
     totalTokensIn += entry.tokens_in || 0;
     totalTokensOut += entry.tokens_out || 0;
     totalCost += Number(entry.estimated_cost || 0);

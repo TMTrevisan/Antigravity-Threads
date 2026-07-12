@@ -560,6 +560,8 @@ export default function Home() {
       if (data.success || payload.stats) {
         setTelemetry(payload.stats);
         setTelemetryLogs(payload.recentLogs);
+      } else if (data.error) {
+        console.warn('[telemetry] API returned error:', data.error);
       }
     } catch (err) {
       console.error('Failed to fetch telemetry:', err);
