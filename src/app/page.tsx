@@ -11,6 +11,7 @@ import Sidebar from '@/components/Sidebar';
 import CommandPalette, { useCommandPaletteShortcut, type PaletteAction } from '@/components/CommandPalette';
 import DarkModeToggle from '@/components/DarkModeToggle';
 import MetricsTab from '@/components/MetricsTab';
+import OutfitsTab from '@/components/OutfitsTab';
 import type { Garment, WearLog, SavedOutfit, StylistOutput, TelemetryStats, IngestGroup } from '@/types/db';
 import { INGEST_LIMITS } from '@/lib/constants';
 import { getItemWornCount, getItemCostPerWear, filterGarments } from '@/lib/garment-utils';
@@ -1143,98 +1144,20 @@ export default function Home() {
                 />
               )}
               {closetSubTab === 'outfits' && (
-                <div className="space-y-6">
-                  {loadingOutfits ? (
-                    <div className="text-center py-12"><p className="text-[var(--text-secondary)] text-xs">Loading outfits...</p></div>
-                  ) : savedOutfits.length === 0 ? (
-                    <div className="text-center py-12 border border-[#EAE5D9] border-dashed rounded-3xl bg-white/40">
-                      <p className="text-[var(--text-secondary)] text-xs">No saved outfits yet. Generate some in the AI Stylist tab!</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {savedOutfits.map((outfit) => {
-                        const outfitItems = outfit.item_ids
-                          .map(id => items.find(item => item.id === id))
-                          .filter((item): item is Garment => !!item);
-
-                        return (
-                          <div key={outfit.id} className="border border-[#EAE5D9] bg-white rounded-3xl p-5 flex flex-col justify-between space-y-4 shadow-xl shadow-stone-200/30">
-                            <div>
-                              <div className="flex justify-between items-start mb-3 border-b border-[#F5F2EB] pb-2">
-                                <h3 className="text-sm font-extrabold text-[var(--text-primary)]">{outfit.name}</h3>
-                                <button 
-                                  onClick={() => deleteSavedOutfit(outfit.id)}
-                                  className="text-xs font-extrabold text-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]/80"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-
-                              <div className="grid grid-cols-3 gap-2 mb-3">
-                                {outfitItems.map(oi => (
-                                  <div key={oi.id} className="border border-[#EAE5D9] bg-[#FBFBFA] rounded-2xl overflow-hidden flex flex-col relative group">
-                                    {/* Color Indicator Swatch Badge */}
-                                    <div className="absolute top-1 right-1 z-10 flex items-center justify-center">
-                                      <span 
-                                        className="w-3.5 h-3.5 rounded-full border border-white shadow-sm block" 
-                                        style={{ backgroundColor: oi.hex_code || '#ddd' }} 
-                                        title={`${oi.color_family || 'Custom Color'} swatch`}
-                                      />
-                                    </div>
-                                    <div className="relative aspect-square w-full">
-                                      <img src={oi.primary_image_url || ''} alt="" className="object-contain w-full h-full mix-blend-multiply" />
-                                    </div>
-                                    <div className="p-1 text-center bg-[#F5F2EB] border-t border-[#EAE5D9]">
-                                      <p className="text-[8.5px] font-black text-[var(--text-primary)] truncate">{oi.brand ? `${oi.brand} ` : ''}{oi.sub_category}</p>
-                                      <p className="text-[7.5px] font-bold text-[var(--text-secondary)] truncate lowercase">{oi.fabric_type || ''} • {oi.color_family}</p>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* Detailed item links inside Saved Outfits list card views */}
-                              <div className="space-y-1 bg-[#FAF8F5] border border-[#EAE5D9] p-3 rounded-2xl mb-3">
-                                <p className="text-[9px] uppercase font-black tracking-widest text-[var(--text-secondary)] mb-1.5 select-none">Outfit Constituents</p>
-                                {outfitItems.map(oi => (
-                                  <div 
-                                    key={oi.id}
-                                    onClick={() => setEditingItem(oi)}
-                                    className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-stone-100 transition cursor-pointer select-none"
-                                  >
-                                    <span className="font-extrabold text-[var(--text-primary)] hover:underline flex items-center gap-1.5">
-                                      <span 
-                                        className="w-2.5 h-2.5 rounded-full border border-stone-300 inline-block shadow-inner shrink-0" 
-                                        style={{ backgroundColor: oi.hex_code || '#ddd' }}
-                                      />
-                                      {oi.brand ? `${oi.brand} ` : ''}{oi.sub_category}
-                                    </span>
-                                    <span className="text-[10px] font-bold text-[var(--accent-terracotta)] uppercase shrink-0">edit ↗</span>
-                                  </div>
-                                ))}
-                              </div>
-
-                              {outfit.styling_reasoning && (
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-3.5 font-semibold">{outfit.styling_reasoning}</p>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => setVisualModal({
-                                  outfitName: outfit.name,
-                                  items: outfitItems,
-                                  tab: 'collage'
-                                })}
-                                className="w-full py-2.5 bg-[#FAF8F5] text-[var(--accent-terracotta)] border border-[#EAE5D9] hover:bg-[#F5F2EB] rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5"
-                              >
-                                🎨 View Outfit Visuals
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                <OutfitsTab
+                  outfits={savedOutfits}
+                  items={items}
+                  loading={loadingOutfits}
+                  onDelete={deleteSavedOutfit}
+                  onEditItem={setEditingItem}
+                  onVisualize={(outfit, resolved) =>
+                    setVisualModal({
+                      outfitName: outfit.name,
+                      items: resolved,
+                      tab: 'collage',
+                    })
+                  }
+                />
               )}
 
               {/* MEASUREMENTS LOCKER SUB-TAB */}
