@@ -9,6 +9,7 @@ import ClosetItemsTab from '@/components/ClosetItemsTab';
 import EditModal from '@/components/EditModal';
 import Sidebar from '@/components/Sidebar';
 import CommandPalette, { useCommandPaletteShortcut, type PaletteAction } from '@/components/CommandPalette';
+import DarkModeToggle from '@/components/DarkModeToggle';
 import type { Garment, WearLog, SavedOutfit, StylistOutput, TelemetryStats, IngestGroup } from '@/types/db';
 import { INGEST_LIMITS } from '@/lib/constants';
 import { getItemWornCount, getItemCostPerWear, filterGarments } from '@/lib/garment-utils';
@@ -3042,6 +3043,11 @@ export default function Home() {
       >
         <span className="text-xl">💬</span>
       </button>
+
+      {/* DARK MODE TOGGLE (bottom-right corner, next to chat on mobile) */}
+      <div className="fixed bottom-20 right-20 lg:bottom-6 lg:right-24 z-40">
+        <DarkModeToggle />
+      </div>
 
       {/* CMD+K PALETTE TRIGGER (bottom-left) */}
       <button

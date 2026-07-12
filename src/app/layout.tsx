@@ -39,11 +39,25 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)]">
         <Toaster>{children}</Toaster>
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              // Apply persisted theme before React hydrates to avoid
+              // a flash of the wrong palette. Matches the logic in
+              // src/lib/use-dark-mode.ts.
+              (function() {
+                try {
+                  var mode = localStorage.getItem('atelier-dark-mode') || 'system';
+                  var effective = mode;
+                  if (mode === 'system') {
+                    effective = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                  }
+                  if (effective === 'dark') document.documentElement.classList.add('dark');
+                } catch (e) {}
+              })();
+
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/sw.js').then(function(reg) {

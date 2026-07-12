@@ -1,9 +1,12 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  /* Atelier warm-light palette (default) */
   --background: #F9F6F0;
   --foreground: #3A3530;
-  
+
   --bg-main: #F9F6F0;
   --bg-sidebar: #D2C4B1;
   --bg-card-primary: #FFFFFF;
@@ -13,12 +16,48 @@
   --accent-terracotta: #C86B55;
   --accent-sage: #8FA89B;
   --accent-apricot: #EAA97E;
+
+  /* Derived surfaces */
+  --bg-elevated: #FFFFFF;
+  --bg-input: #FAF8F5;
+  --bg-hover: #F3EFE6;
+  --border-subtle: #EAE5D9;
+  --text-muted: #A39A8E;
+  --shadow-card: 0 4px 16px rgba(110, 101, 92, 0.08), 0 1px 3px rgba(110, 101, 92, 0.04);
+  --shadow-soft: 0 2px 8px rgba(110, 101, 92, 0.06);
+}
+
+/* Dark mode — applied when <html class="dark"> is set. Keeps the
+   same accent colors (terracotta/sage/apricot) but flips surfaces. */
+:root.dark,
+.dark {
+  --background: #1A1814;
+  --foreground: #F3EFE6;
+
+  --bg-main: #1A1814;
+  --bg-sidebar: #25221D;
+  --bg-card-primary: #25221D;
+  --bg-card-secondary: #2F2B25;
+  --text-primary: #F3EFE6;
+  --text-secondary: #A39A8E;
+  --accent-terracotta: #E08469;
+  --accent-sage: #A6BFB1;
+  --accent-apricot: #F0B68A;
+
+  --bg-elevated: #2F2B25;
+  --bg-input: #1F1D18;
+  --bg-hover: #2A2620;
+  --border-subtle: #3A3530;
+  --text-muted: #6E655C;
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 body {
   background: var(--bg-main);
   color: var(--text-primary);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 /* Chain-stitch embroidered appearance for logo */
@@ -26,12 +65,12 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
   font-weight: 800;
   color: var(--text-primary);
-  text-shadow: 
-    1px 1px 0px #E5DCCB,
-    -1px -1px 0px #E5DCCB,
-    1px -1px 0px #E5DCCB,
-    -1px 1px 0px #E5DCCB,
-    2px 2px 2px rgba(58, 53, 48, 0.15);
+  text-shadow:
+    1px 1px 0px var(--border-subtle),
+    -1px -1px 0px var(--border-subtle),
+    1px -1px 0px var(--border-subtle),
+    -1px 1px 0px var(--border-subtle),
+    2px 2px 2px rgba(0, 0, 0, 0.15);
   letter-spacing: -0.02em;
 }
 
@@ -39,21 +78,30 @@ body {
 .tactile-shadow-sm {
   box-shadow: 0 2px 8px rgba(110, 101, 92, 0.06);
 }
+.dark .tactile-shadow-sm {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
 
 .tactile-shadow-md {
   box-shadow: 0 4px 16px rgba(110, 101, 92, 0.08), 0 1px 3px rgba(110, 101, 92, 0.04);
+}
+.dark .tactile-shadow-md {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .tactile-shadow-lg {
   box-shadow: 0 8px 32px rgba(110, 101, 92, 0.1), 0 2px 6px rgba(110, 101, 92, 0.05);
 }
+.dark .tactile-shadow-lg {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
 
 /* Custom Polaroids styling */
 .polaroid-frame {
-  background: #ffffff;
+  background: var(--bg-elevated);
   padding: 8px 8px 24px 8px;
-  border: 1px solid #EAE5D9;
-  box-shadow: 0 4px 10px rgba(110, 101, 92, 0.08);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-soft);
   transform: rotate(-1deg);
   transition: transform 0.2s ease;
 }
@@ -75,4 +123,3 @@ body {
 .animate-toast-in {
   animation: toastIn 160ms ease-out;
 }
-
