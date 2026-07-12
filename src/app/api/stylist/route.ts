@@ -64,9 +64,15 @@ export async function POST(request: Request) {
       1. Contrast & Tonality: Ensure outfits use balanced contrast (e.g. light top with dark bottoms) or varying tonal shades of the same colors.
       2. Silhouette & Fit: Balance shapes (e.g. relaxed top with tapered bottom, or structured layers).
       3. Weather & Event: Align fits and fabrics (e.g. linen for heat, wool/layering for cold) with event formality.
-      4. Complete Outfits: Combine a top and a bottom, plus outerwear/footwear if available. Refer to the items ONLY by their exact UUID from the list.
-      
-      Suggest 4 to 6 distinct outfits. For each outfit, list the UUIDs of the items used.
+      4. **MANDATORY STRUCTURE**: Every outfit MUST include:
+         - At least one item from category "Tops" or "Tailoring" (the top half)
+         - At least one item from category "Bottoms" (the bottom half)
+         - One item from category "Footwear" if any footwear exists in the wardrobe
+         - Optionally one item from category "Outerwear" if weather warrants
+         An outfit that lacks a top OR a bottom is INVALID and will be rejected. Do not generate sweaters without a shirt underneath, or shorts without a shirt.
+      5. Refer to the items ONLY by their exact UUID from the list.
+
+      Suggest 4 to 6 distinct outfits. For each outfit, list the UUIDs of the items used. Every listed UUID must come from the wardrobe above.
       Also list 2 specific wardrobe gaps (staples or colors missing) to achieve their lookbook style.
     `;
 

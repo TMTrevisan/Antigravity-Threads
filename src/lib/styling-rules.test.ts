@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scoreOutfit, filterValidOutfits, SCORE_MATCH, SCORE_CLASH } from './styling-rules';
+import { scoreOutfit, filterValidOutfits, checkCompleteness, SCORE_MATCH, SCORE_CLASH } from './styling-rules';
 import type { Garment } from '@/types/db';
 
 const base = {
@@ -94,5 +94,53 @@ describe('scoreOutfit()', () => {
       expect(entry.ruleId).toBeTruthy();
       expect([SCORE_MATCH, 1, SCORE_CLASH]).toContain(entry.score);
     }
+  });
+});
+
+describe('checkCompleteness()', () => {
+  const top = { ...base, id: 'top', category: 'Tops' } as Garment;
+  const bottom = { ...base, id: 'bot', category: 'Bottoms' } as Garment;
+  const footwear = { ...base, id: 'shoe', category: 'Footwear' } as Garment;
+  const outerwear = { ...base, id: 'coat', category: 'Outerwear' } as Garment;
+  const tailoring = { ...base, id: 'blazer', category: 'Tailoring' } as Garment;
+
+  it('flags incomplete outfits missing a top', () => {
+    const c = checkCompleteness(['bot', 'shoe'], [bottom, footwear]);
+    expect(c.hasTop).toBe(false);
+    expect(c.hasBottom).toBe(true);
+    expect(c.isComplete).toBe(false);
+  });
+
+  it('flags incomplete outfits missing a bottom', () => {
+    const c = checkCompleteness(['top', 'shoe'], [top, footwear]);
+    expect(c.hasTop).toBe(true);
+    expect(c.hasBottom).toBe(false);
+    expect(c.isComplete).toBe(false);
+  });
+
+  it('accepts outfits with top + bottom', () => {
+    const c = checkCompleteness(['top', 'bot'], [top, bottom]);
+    expect(c.isComplete).toBe(true);
+  });
+
+  it('accepts tailoring as the top half', () => {
+    // No regular Tops, but Tailoring counts as a top half.
+    const c = checkCompleteness(['blazer', 'bot'], [tailoring, bottom]);
+    expect(c.hasTop).toBe(true);
+    expect(c.isComplete).toBe(true);
+  });
+
+  it('tracks footwear and outerwear separately', () => {
+    const c = checkCompleteness(['top', 'bot', 'shoe', 'coat'], [top, bottom, footwear, outerwear]);
+    expect(c.hasFootwear).toBe(true);
+    expect(c.hasOuterwear).toBe(true);
+    expect(c.isComplete).toBe(true);
+  });
+
+  it('marks invalid UUIDs as missing top/bottom (via lookup)', () => {
+    const c = checkCompleteness(['top', 'ghost'], [top]);
+    expect(c.hasTop).toBe(true);
+    expect(c.hasBottom).toBe(false);
+    expect(c.isComplete).toBe(false);
   });
 });

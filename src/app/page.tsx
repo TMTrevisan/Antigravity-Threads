@@ -11,7 +11,7 @@ import { INGEST_LIMITS } from '@/lib/constants';
 import { getItemWornCount, getItemCostPerWear, filterGarments } from '@/lib/garment-utils';
 import { compressImage, drawOutfitCollage } from '@/lib/image';
 import { garmentsToCsv, downloadCsv } from '@/lib/csv';
-import { filterValidOutfits, scoreOutfit } from '@/lib/styling-rules';
+import { filterValidOutfits, scoreOutfit, checkCompleteness } from '@/lib/styling-rules';
 
 export default function Home() {
   const notify = useToasts();
@@ -734,12 +734,29 @@ export default function Home() {
         console.warn(`[GenerateStylist] dropped ${before - valid.length} outfits with invalid UUIDs`);
       }
 
-      // Score + sort by total (descending) so the best outfits appear first.
+      // Score + completeness. Incomplete outfits (no top OR no bottom)
+      // get a heavy penalty so they're sorted to the bottom instead of
+      // being shown as "valid" outfits.
       const eventCtx = { event: eventInput, weather: weatherInput };
       const ranked = [...valid]
-        .map((o: any) => ({ ...o, _score: scoreOutfit(o.item_ids, items, eventCtx).total }))
+        .map((o: any) => {
+          const s = scoreOutfit(o.item_ids, items, eventCtx);
+          const c = checkCompleteness(o.item_ids, items);
+          // Incomplete outfits get a -2.0 penalty (below any rule score).
+          // Otherwise use the rule score.
+          const final = c.isComplete ? s.total : s.total - 2;
+          return { ...o, _score: final, _completeness: c };
+        })
         .sort((a, b) => (b._score ?? 0) - (a._score ?? 0))
-        .map(({ _score, ...rest }: any) => rest);
+        .map(({ _score, _completeness, ...rest }: any) => rest);
+
+      const incompleteCount = ranked.filter((o: any) => {
+        const c = checkCompleteness(o.item_ids, items);
+        return !c.isComplete;
+      }).length;
+      if (incompleteCount > 0) {
+        console.warn(`[GenerateStylist] ${incompleteCount}/${ranked.length} outfits are missing top or bottom; surfaced to bottom of list`);
+      }
 
       setStylistResult({ ...recs, outfits: ranked });
       fetchTelemetry();

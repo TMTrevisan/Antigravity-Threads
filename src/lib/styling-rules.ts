@@ -189,6 +189,44 @@ export function filterValidOutfits<T extends { item_ids: string[] }>(
   return outfits.filter((o) => o.item_ids.every((id) => ids.has(id)));
 }
 
+/**
+ * Determine whether an outfit is "complete" — has at least one top
+ * AND at least one bottom. Footwear and outerwear are optional but
+ * tracked for tie-breaking.
+ *
+ * Gemini often drops the top (returns just sweater + shorts), so we
+ * explicitly require both halves of the silhouette.
+ */
+export interface OutfitCompleteness {
+  hasTop: boolean;
+  hasBottom: boolean;
+  hasFootwear: boolean;
+  hasOuterwear: boolean;
+  isComplete: boolean;
+}
+
+export function checkCompleteness(
+  itemIds: string[],
+  wardrobe: Map<string, Garment> | Garment[]
+): OutfitCompleteness {
+  const lookup = wardrobe instanceof Map ? wardrobe : new Map(wardrobe.map((g) => [g.id, g]));
+  const items = itemIds.map((id) => lookup.get(id)).filter((g): g is Garment => !!g);
+
+  const cats = items.map((i) => i.category.toLowerCase());
+  const hasTop = cats.some((c) => c === 'tops' || c === 'tailoring'); // tailoring acts as top half
+  const hasBottom = cats.some((c) => c === 'bottoms');
+  const hasFootwear = cats.some((c) => c === 'footwear');
+  const hasOuterwear = cats.some((c) => c === 'outerwear');
+
+  return {
+    hasTop,
+    hasBottom,
+    hasFootwear,
+    hasOuterwear,
+    isComplete: hasTop && hasBottom,
+  };
+}
+
 /* ─────────────────────────────────────────────────────────────────────
  * TODO: rules to add (waiting on user taste notes)
  * ─────────────────────────────────────────────────────────────────────
