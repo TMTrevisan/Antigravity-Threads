@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { Garment, IngestGroup, WearLog } from '@/types/db';
 import { compressImage } from '@/lib/image';
+import EmptyState from './EmptyState';
 
 interface SnapTabProps {
   /** Existing items so we can find the freshly-uploaded one for validation. */
@@ -36,11 +37,38 @@ export default function SnapTab({ items, onSelectForValidation, notify, onItemsC
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   const [continuousSnap, setContinuousSnap] = useState(false);
   const [activeDetailGroupId, setActiveDetailGroupId] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{
+    total: number;
+    completed: number;
+    failed: number;
+  } | null>(null);
 
   const detailFilePickerRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const detailCameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Global drag-and-drop visual feedback. Fires when the user drags
+  // any file over the window, even if they don't drop on the dropzone.
+  useEffect(() => {
+    const onDragEnter = (e: DragEvent) => {
+      if (e.dataTransfer?.types?.includes('Files')) setIsDraggingOver(true);
+    };
+    const onDragLeave = (e: DragEvent) => {
+      // Only hide when the user leaves the window entirely.
+      if (e.relatedTarget === null) setIsDraggingOver(false);
+    };
+    const onDrop = () => setIsDraggingOver(false);
+    window.addEventListener('dragenter', onDragEnter);
+    window.addEventListener('dragleave', onDragLeave);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragenter', onDragEnter);
+      window.removeEventListener('dragleave', onDragLeave);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, []);
 
   const handleFilesSelected = (files: FileList | null, isCameraInput: boolean = false) => {
     if (!files || files.length === 0) return;
@@ -146,6 +174,7 @@ export default function SnapTab({ items, onSelectForValidation, notify, onItemsC
     }
 
     setIsProcessingBatch(true);
+    setBatchProgress({ total: pendingGroups.length, completed: 0, failed: 0 });
     const successfullyUploadedIds: string[] = [];
 
     // Snapshot for loop so React state changes don't desync the iteration.
@@ -175,11 +204,13 @@ export default function SnapTab({ items, onSelectForValidation, notify, onItemsC
 
         successfullyUploadedIds.push(payload.item.id);
         setIngestGroups((prev) => prev.map((g, idx) => (idx === index ? { ...g, status: 'processing' } : g)));
+        setBatchProgress((p) => (p ? { ...p, completed: p.completed + 1 } : p));
       } catch (err: any) {
         notify.error(err.message || 'Upload failed');
         setIngestGroups((prev) =>
           prev.map((g, idx) => (idx === index ? { ...g, status: 'failed', error: err.message } : g))
         );
+        setBatchProgress((p) => (p ? { ...p, failed: p.failed + 1 } : p));
       }
     }
 
@@ -209,6 +240,9 @@ export default function SnapTab({ items, onSelectForValidation, notify, onItemsC
 
     setIngestGroups((prev) => prev.map((g) => (g.status === 'processing' ? { ...g, status: 'done' } : g)));
     setIsProcessingBatch(false);
+    // Keep the progress chip visible for a moment so the user sees the
+    // "done" state, then clear it.
+    setTimeout(() => setBatchProgress(null), 3000);
   };
 
   const retryGroupUpload = async (groupId: string) => {
@@ -259,6 +293,51 @@ export default function SnapTab({ items, onSelectForValidation, notify, onItemsC
 
   return (
     <div className="space-y-6">
+      {/* Full-page drag overlay — when files are being dragged over the
+          window, fade in a terracotta tint so the user knows where to drop. */}
+      {isDraggingOver && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-[80] bg-[var(--accent-terracotta)]/10 backdrop-blur-[1px] flex items-center justify-center"
+        >
+          <div className="bg-white border-2 border-dashed border-[var(--accent-terracotta)] rounded-3xl px-12 py-8 shadow-2xl text-center">
+            <p className="text-2xl mb-1">📥</p>
+            <p className="text-sm font-extrabold text-[var(--accent-terracotta)]">Drop photos to ingest</p>
+            <p className="text-[10px] text-[var(--text-secondary)] mt-1">First photo = primary; rest = detail shots</p>
+          </div>
+        </div>
+      )}
+
+      {/* Progress chip — visible only during/right-after a batch run. */}
+      {batchProgress && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--accent-terracotta)]/5 border border-[var(--accent-terracotta)]/20 rounded-2xl">
+          <div className="flex-1">
+            <div className="flex items-center justify-between text-[10px] uppercase font-bold text-[var(--accent-terracotta)] mb-1.5">
+              <span>
+                {batchProgress.completed === batchProgress.total && !isProcessingBatch
+                  ? '✓ Done'
+                  : `Processing ${batchProgress.completed + 1} of ${batchProgress.total}`}
+              </span>
+              <span className="font-mono normal-case opacity-70">
+                {batchProgress.completed}/{batchProgress.total}
+                {batchProgress.failed > 0 && (
+                  <span className="ml-2 text-rose-600">· {batchProgress.failed} failed</span>
+                )}
+              </span>
+            </div>
+            <div className="h-1.5 bg-[var(--accent-terracotta)]/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[var(--accent-terracotta)] transition-all duration-300"
+                style={{
+                  width: `${Math.round(
+                    ((batchProgress.completed + batchProgress.failed) / Math.max(1, batchProgress.total)) * 100
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
       <input
         ref={detailCameraInputRef}
         type="file"
@@ -294,9 +373,26 @@ export default function SnapTab({ items, onSelectForValidation, notify, onItemsC
 
       <div className="border border-[#EAE5D9] bg-[var(--bg-card-secondary)] rounded-3xl p-6 tactile-shadow-md">
         <h2 className="text-base font-extrabold text-[var(--text-primary)] mb-1">Tactile Atelier Ingest Queue</h2>
-        <p className="text-[var(--text-secondary)] text-xs mb-6">
+        <p className="text-[var(--text-secondary)] text-xs mb-4">
           Select primary garment layout photos. Then, add detail shots (laundry tags, textures, sizing labels) under each card container. Gemini will synthesize the data concurrently to extract perfect tags.
         </p>
+
+        {/* Tip cards — quick visual guide for what to photograph. */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+          {[
+            { icon: '📐', title: 'Wide shot', body: 'Full garment flat or on hanger, neutral background.' },
+            { icon: '🏷️', title: 'Tag close-up', body: 'Brand, size, fabric content. One per garment.' },
+            { icon: '✨', title: 'Texture / detail', body: 'Optional. Highlights stitching, weave, or pattern.' },
+          ].map((t) => (
+            <div key={t.title} className="bg-white/70 border border-[#EAE5D9] rounded-2xl px-3 py-2.5">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--accent-terracotta)] flex items-center gap-1">
+                <span aria-hidden="true">{t.icon}</span>
+                {t.title}
+              </p>
+              <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 leading-relaxed">{t.body}</p>
+            </div>
+          ))}
+        </div>
 
         <div className="space-y-6">
           <div className="border-2 border-dashed border-[#DCD1C0] bg-white/50 rounded-3xl p-6 flex flex-col items-center justify-center gap-4 text-center">
