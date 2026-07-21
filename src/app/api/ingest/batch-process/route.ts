@@ -26,7 +26,7 @@ export const POST = withUser(async ({ user, request }) => {
       // 1. Fetch the garment owned by THIS user, joined with its images.
       const { data: garment, error: fetchError } = await user.client
         .from('garments')
-        .select('*, garment_images(*)')
+        .select('*, garment_assets(*), garment_images(*)')
         .eq('id', id)
         .eq('user_id', user.id) // RLS should enforce this, but be explicit
         .single();
@@ -35,7 +35,27 @@ export const POST = withUser(async ({ user, request }) => {
         throw new Error(`Garment not found: ${fetchError?.message || 'empty row'}`);
       }
 
-      const imagesList = garment.garment_images || [];
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+
+      const assetsList = (garment.garment_assets || []).map((asset: any) => {
+        let fullUrl = asset.storage_path;
+        if (fullUrl && !fullUrl.startsWith('http')) {
+          fullUrl = `${supabaseUrl}/storage/v1/object/public/${asset.bucket || 'wardrobe-images'}/${asset.storage_path}`;
+        }
+        return {
+          id: asset.id,
+          storage_path: fullUrl,
+          asset_type: asset.kind === 'profile' ? 'profile' : 'detail',
+        };
+      });
+
+      const legacyList = (garment.garment_images || []).map((img: any) => ({
+        id: img.id,
+        storage_path: img.storage_path,
+        asset_type: img.asset_type || 'profile',
+      }));
+
+      const imagesList = assetsList.length > 0 ? assetsList : legacyList;
       if (imagesList.length === 0) {
         throw new Error(`No images registered for garment ${id}.`);
       }

@@ -82,25 +82,49 @@ export async function POST(request: Request) {
         .from('wardrobe-images')
         .getPublicUrl(filePath);
 
-      // Save record in garment_images
+      // 1. Insert into new garment_assets table
+      const { data: assetRecord } = await user.client
+        .from('garment_assets')
+        .insert([
+          {
+            user_id: user.id,
+            garment_id: garment.id,
+            kind: index === 0 ? 'profile' : 'detail',
+            bucket: 'wardrobe-images',
+            storage_path: filePath,
+            mime_type: file.type || 'image/jpeg',
+            is_primary: index === 0,
+            qa_status: 'passed',
+            qa_json: {},
+          },
+        ])
+        .select()
+        .single();
+
+      // 2. Insert into legacy garment_images table for backward compatibility
       const { data: imgRecord, error: imgError } = await user.client
         .from('garment_images')
         .insert([
           {
             garment_id: garment.id,
             storage_path: publicUrl,
-            is_primary_profile: index === 0, // Mark the first image as primary
+            is_primary_profile: index === 0,
             asset_type: index === 0 ? 'profile' : 'detail',
           },
         ])
         .select()
         .single();
 
-      if (imgError) {
+      if (imgError && !assetRecord) {
         throw new Error(`Failed to register image record: ${imgError.message}`);
       }
 
-      return imgRecord;
+      return {
+        id: assetRecord?.id || imgRecord?.id,
+        storage_path: publicUrl,
+        is_primary_profile: index === 0,
+        asset_type: index === 0 ? 'profile' : 'detail',
+      };
     });
 
     const registeredImages = await Promise.all(imageUploadPromises);

@@ -33,18 +33,44 @@ function pickUpdatable(body: Record<string, unknown>): Partial<Record<GarmentUpd
   return out;
 }
 
-// GET all items joined with their garment_images
+// GET all items joined with their images (supports both new garment_assets and legacy garment_images)
 export const GET = withUser(async ({ user }) => {
   const { data: items, error } = await user.client
     .from('garments')
-    .select('*, garment_images(*)')
+    .select('*, garment_assets(*), garment_images(*)')
     .order('created_at', { ascending: false });
 
   if (error) return fail(500, error.message);
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+
   const itemsWithImages = (items || []).map((item: any) => {
-    const images = item.garment_images || [];
+    // 1. Map new garment_assets pipeline records if present
+    const assets = (item.garment_assets || []).map((asset: any) => {
+      let fullUrl = asset.storage_path;
+      if (fullUrl && !fullUrl.startsWith('http')) {
+        fullUrl = `${supabaseUrl}/storage/v1/object/public/${asset.bucket || 'wardrobe-images'}/${asset.storage_path}`;
+      }
+      return {
+        id: asset.id,
+        storage_path: fullUrl,
+        is_primary_profile: asset.is_primary ?? false,
+        asset_type: asset.kind === 'profile' ? 'profile' : 'detail',
+      };
+    });
+
+    // 2. Map legacy garment_images records if present
+    const legacyImages = (item.garment_images || []).map((img: any) => ({
+      id: img.id,
+      storage_path: img.storage_path,
+      is_primary_profile: img.is_primary_profile ?? false,
+      asset_type: img.asset_type || 'profile',
+    }));
+
+    // Combine images (new pipeline assets preferred)
+    const images = assets.length > 0 ? assets : legacyImages;
     const primary = images.find((img: any) => img.is_primary_profile) || images[0];
+
     return {
       ...item,
       images,
