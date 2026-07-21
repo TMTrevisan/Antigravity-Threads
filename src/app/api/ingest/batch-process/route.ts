@@ -65,7 +65,6 @@ export const POST = withUser(async ({ user, request }) => {
       );
 
       // 2. Fetch all images into base64 (concurrently).
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
       const imageParts = await Promise.all(
         imagesList.map(async (img: any) => {
           // The image URLs are written by our own upload route, so they
